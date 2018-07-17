@@ -59,7 +59,7 @@ public class Processor {
                 break;
             //JSR - Jump to subroutine
             case 0x20:
-                //TODO implement (unclear on how atm)
+
                 break;
             //JMP
             case 0x4C:
@@ -201,9 +201,16 @@ public class Processor {
             case 0x71:
                 addWithCarry(opcode, operand0, operand1);
                 break;
-            //BRK - Break
+            //BIT - Bit test
+            case 0x24:
+            case 0x2C:
+                bitTest(opcode, operand0, operand1);
+                break;
+            //BRK - Break. Store the program counter and processor state on the stack and force an interrupt
             case 0x00:
-                //CMP - Compare with accumulator
+                brk();
+                break;
+            //CMP - Compare with accumulator
             case 0xC9:
             case 0xC5:
             case 0xD5:
@@ -340,10 +347,358 @@ public class Processor {
             case 0x5E:
                 logicalShiftRight(opcode, operand0, operand1);
                 break;
+            //SBC - Subtract with carry
+            case 0xE9:
+            case 0xE5:
+            case 0xF5:
+            case 0xED:
+            case 0xFD:
+            case 0xF9:
+            case 0xE1:
+            case 0xF1:
+                subtractWithCarry(opcode, operand0, operand1);
+                break;
+            //ORA - Logical or
+            case 0x09:
+            case 0x05:
+            case 0x15:
+            case 0x0D:
+            case 0x1D:
+            case 0x19:
+            case 0x01:
+            case 0x11:
+                logicalOr(opcode, operand0, operand1);
+                break;
+            //ROL - rotate left
+            case 0x2A:
+            case 0x26:
+            case 0x36:
+            case 0x2E:
+            case 0x3E:
+                rotateLeft(opcode, operand0, operand1);
+                break;
+            //ROR - rotate right
+            case 0x6A:
+            case 0x66:
+            case 0x76:
+            case 0x6E:
+            case 0x7E:
+                rotateRight(opcode, operand0, operand1);
+                break;
+            //PHA - Push Accumulator
+            case 0x48:
+                memory.setByte(stackPointer--, accumulator);
+                currentCycles = 3;
+                break;
+            //PHP - Push Processor Status
+            case 0x08:
+                memory.setByte(stackPointer, getStatus());
+                currentCycles = 3;
+                break;
+            //PLA - Pull Accumulator
+            case 0x68:
+                accumulator = memory.getByte(stackPointer++);
+                currentCycles = 4;
+                break;
+            //PLP - Pull Processor Status
+            case 0x28:
+                int status = memory.getByte(stackPointer++);
+                setProcessorFlags(status);
+                currentCycles = 4;
+                break;
+            //RTI - Return From Interrupt
+            case 0x40:
+                returnFromInterrupt();
+                currentCycles = 6;
+                break;
+            //RTS - Return from subroutine
+            case 0x60:
+                returnFromSubroutine();
+                currentCycles = 6;
+                break;
             default:
                 break; //TODO add exception
         }
     }
+
+    private void rotateRight(int opcode, int operand0, int operand1){
+        int original = 0;
+        int result = 0;
+        switch(opcode){
+            case 0x6A:
+                original = accumulator;
+                break;
+            case 0x66:
+                original = memory.getByte(operand0);
+                break;
+            case 0x76:
+                original = memory.getByte(zeroPageWithOffset(operand0, xIndex));
+                break;
+            case 0x6E:
+                original = memory.getByte(convertOperandsToAddress(operand0, operand1));
+                break;
+            case 0x7E:
+                original = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+                break;
+            default:
+                break; //TODO add exception
+        }
+        result = original >> 1;
+        result += 0xFF + (original % 2);
+        accumulator = result;
+        currentCycles = 2;
+        if(accumulator == 0){
+            zeroFlag = true;
+        }
+        if(original >> 7 == 1){
+            carryFlag = true;
+        }
+        if(result >> 7 == 1){
+            signFlag = true;
+        }
+    }
+
+    private void rotateLeft(int opcode, int operand0, int operand1){
+        int original = 0;
+        int result = 0;
+        switch (opcode){
+            case 0x2A:
+                original = accumulator;
+                break;
+            case 0x26:
+                original = memory.getByte(operand0);
+                break;
+            case 0x36:
+                original = memory.getByte(zeroPageWithOffset(operand0, xIndex));
+                break;
+            case 0x2E:
+                original = memory.getByte(convertOperandsToAddress(operand0, operand1));
+                break;
+            case 0x3E:
+                original = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+                break;
+            default:
+                break;
+        }
+        result = original << 1;
+        result %= 256;
+        result += original >> 7;
+        accumulator = result;
+        currentCycles = 2;
+        if(accumulator == 0){
+            zeroFlag = true;
+        }
+        if(original >> 7 == 1){
+            carryFlag = true;
+        }
+        if(result >> 7 == 1){
+            signFlag = true;
+        }
+    }
+
+    private void returnFromSubroutine(){
+        int highByte = memory.getByte(stackPointer++);
+        int lowByte = memory.getByte(stackPointer++);
+        programCounter = highByte * ENDIAN_MULT + lowByte;
+    }
+
+    private void returnFromInterrupt(){
+        int status = memory.getByte(stackPointer++);
+        setProcessorFlags(status);
+        int highByte = memory.getByte(stackPointer++);
+        int lowByte = memory.getByte(stackPointer++);
+        programCounter = highByte * ENDIAN_MULT + lowByte;
+    }
+
+    private void setProcessorFlags(int status){
+        carryFlag = status % 2 == 1;
+        status /= 2;
+        zeroFlag = status % 2 == 1;
+        status /= 2;
+        interruptFlag = status % 2 == 1;
+        status /= 2;
+        decimalModeFlag = status % 2 == 1;
+        status /= 2;
+        softwareInterruptFlag = status % 2 == 1;
+        status /= 2;
+        status /= 2;
+        overflowFlag = status % 2 == 1;
+        status /= 2;
+        signFlag = status % 2 == 1;
+    }
+
+    private void logicalOr(int opcode, int operand0, int operand1){
+        switch(opcode){
+            case 0x09:
+                accumulator |= operand0;
+                currentCycles = 2;
+                break;
+            case 0x05:
+                accumulator |= memory.getByte(operand0);
+                currentCycles = 3;
+                break;
+            case 0x15:
+                accumulator |= zeroPageWithOffset(operand0, xIndex);
+                currentCycles = 4;
+                break;
+            case 0x0D:
+                accumulator |= memory.getByte(convertOperandsToAddress(operand0, operand1));
+                currentCycles = 4;
+                break;
+            case 0x1D:
+                accumulator |= memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+                currentCycles = 4;
+                if(isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)){
+                    currentCycles += 1;
+                }
+                break;
+            case 0x19:
+                accumulator |= memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
+                if(isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex)){
+                    currentCycles += 1;
+                }
+                break;
+            case 0x01:
+                accumulator |= memory.getByte(indirectX(operand0));
+                break;
+            case 0x11:
+                accumulator |= memory.getByte(indirectY(operand0));
+                if(isPageBoundaryCrossed(convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand0+1)), yIndex)){
+                    currentCycles += 1;
+                }
+                break;
+            default:
+                break; //TODO throw exception
+        }
+        if(accumulator == 0){
+            zeroFlag = true;
+        }
+        if(accumulator >> 7 == 1){
+            signFlag = true;
+        }
+    }
+
+    private void brk(){ //TODO
+        programCounter++;
+        int highByte =  programCounter >> 8;
+        int lowByte = programCounter % 0xFF;
+        memory.setByte(stackPointer--, highByte);
+        memory.setByte(stackPointer--, lowByte);
+        softwareInterruptFlag = true;
+        //does Processor status change?
+        memory.setByte(stackPointer--, getStatus());
+        programCounter = 0;
+        programCounter = memory.getByte(0xFFFF) * ENDIAN_MULT;
+        programCounter += memory.getByte(0xFFFE);
+        currentCycles = 7;
+    }
+
+    private void bitTest(int opcode, int operand0, int operand1) {
+        int result = 0;
+        int mem = 0;
+        switch (opcode){
+            case 0x24:
+                mem = memory.getByte(operand0);
+                result = accumulator & mem;
+                currentCycles = 3;
+                break;
+            case 0x2C:
+                mem = convertOperandsToAddress(operand0, operand1);
+                result = accumulator & mem;
+                currentCycles = 4;
+                break;
+            default:
+                //TODO throw exception
+        }
+        if(result == 0){
+            zeroFlag = true;
+        }
+        if(mem >> 6 == 1){
+            overflowFlag = true;
+        }else{
+            overflowFlag = false;
+        }
+        if(mem >> 7 == 1){
+            signFlag = true;
+        }else{
+            signFlag = false;
+        }
+    }
+
+    private int getStatus(){
+        int status = 0;
+        if(signFlag){
+            status += 0b10000000;
+        }
+        if(overflowFlag){
+            status += 0b01000000;
+        }
+        status += 0b00100000;
+        if(softwareInterruptFlag){
+            status += 0b00010000;
+        }
+        if(decimalModeFlag){
+            status += 0b00001000;
+        }
+        if(interruptFlag){
+            status += 0b00000100;
+        }
+        if(zeroFlag){
+            status += 0b00000010;
+        }
+        if(carryFlag){
+            status += 0b00000001;
+        }
+        return status;
+    }
+
+    private void subtractWithCarry(int opcode, int operand0, int operand1){
+        switch (opcode){
+            case 0xE9:
+                accumulator = accumulator - operand0;
+                currentCycles = 2;
+                break;
+            case 0xE5:
+                accumulator = accumulator - memory.getByte(operand0);
+                currentCycles = 3;
+                break;
+            case 0xF5:
+                accumulator = accumulator - memory.getByte(zeroPageWithOffset(operand0, xIndex));
+                currentCycles = 4;
+                break;
+            case 0xED:
+                accumulator = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1));
+                currentCycles = 4;
+                break;
+            case 0xFD:
+                accumulator = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+                currentCycles = 4;
+                if(isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)){
+                    currentCycles += 1;
+                }
+                break;
+            case 0xF9:
+                accumulator = accumulator - memory.getByte(indirectX(operand0));
+                currentCycles = 4;
+                if(isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)){
+                    currentCycles += 1;
+                }
+                break;
+            case 0xE1:
+                accumulator = accumulator - memory.getByte(indirectX(operand0));
+                currentCycles = 6;
+                break;
+            case 0xF1:
+                accumulator = accumulator - memory.getByte(indirectY(operand0));
+                currentCycles = 5;
+                if(isPageBoundaryCrossed(convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand1+1)), yIndex)){
+                    currentCycles += 1;
+                }
+            default:
+                break; //TODO add exception
+        }
+        //TODO implement flag handling
+    } //TODO flag handling
 
     private void logicalShiftRight(int opcode, int operand0, int operand1) {
         int previous = 0;

@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33d42c6b-89f0-44b2-a391-56704ad9551f" name="Default" comment="" />
+    <list default="true" id="33d42c6b-89f0-44b2-a391-56704ad9551f" name="Default" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Processor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Processor.java" afterDir="false" />
+    </list>
     <ignored path="$PROJECT_DIR$/out/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -15,12 +19,24 @@
       <file leaf-file-name="Processor.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/Processor.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="95">
-              <caret line="331" column="22" lean-forward="true" selection-start-line="331" selection-start-column="22" selection-end-line="331" selection-end-column="22" />
+            <state relative-caret-position="608">
+              <caret line="386" column="22" selection-start-line="386" selection-start-column="22" selection-end-line="386" selection-end-column="22" />
               <folding>
+                <element signature="e#12355#12473#0" />
+                <element signature="e#12483#12601#0" />
+                <element signature="e#12320#12430#0" />
+                <element signature="e#12056#12159#0" />
+                <element signature="e#11940#12035#0" />
+                <element signature="e#10932#11048#0" />
+                <element signature="e#11392#11665#0" />
+                <element signature="method#bitTest#0;class#Processor#0" />
+                <element signature="method#getStatus#0;class#Processor#0" />
+                <element signature="method#subtractWithCarry#0;class#Processor#0" />
+                <element signature="method#logicalShiftRight#0;class#Processor#0" />
                 <element signature="method#xorAccumulator#0;class#Processor#0" />
                 <element signature="method#decrementMemory#0;class#Processor#0" />
                 <element signature="method#arithmeticShiftLeft#0;class#Processor#0" />
+                <element signature="method#branch#0;class#Processor#0" />
                 <element signature="method#compareWithAccumulator#0;class#Processor#0" />
                 <element signature="method#compareWithX#0;class#Processor#0" />
                 <element signature="method#compareWithY#0;class#Processor#0" />
@@ -34,15 +50,15 @@
                 <element signature="method#storeX#0;class#Processor#0" />
                 <element signature="method#storeY#0;class#Processor#0" />
                 <element signature="method#indirect#0;class#Processor#0" />
-                <element signature="e#32596#32597#0" expanded="true" />
-                <element signature="e#32652#32653#0" expanded="true" />
+                <element signature="e#42100#42101#0" expanded="true" />
+                <element signature="e#42156#42157#0" expanded="true" />
                 <element signature="method#convertOperandsToAddress#1;class#Processor#0" />
-                <element signature="e#32865#32866#0" expanded="true" />
-                <element signature="e#32914#32915#0" expanded="true" />
+                <element signature="e#42369#42370#0" expanded="true" />
+                <element signature="e#42418#42419#0" expanded="true" />
                 <element signature="method#indirectX#0;class#Processor#0" />
                 <element signature="method#indirectY#0;class#Processor#0" />
-                <element signature="e#33271#33272#0" expanded="true" />
-                <element signature="e#33322#33323#0" expanded="true" />
+                <element signature="e#42775#42776#0" expanded="true" />
+                <element signature="e#42826#42827#0" expanded="true" />
                 <element signature="method#isPageBoundaryCrossed#0;class#Processor#0" />
               </folding>
             </state>
@@ -87,11 +103,17 @@
       <find>short</find>
       <find>0x4c</find>
       <find>DEC</find>
+      <find>BVS</find>
+      <find>JSR</find>
+      <find>BRK</find>
     </findStrings>
     <replaceStrings>
       <replace>ENDIAN_MULT</replace>
       <replace>int</replace>
     </replaceStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
@@ -108,6 +130,7 @@
     <option name="width" value="977" />
     <option name="height" value="1038" />
   </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
     <navigator proportions="" version="1">
       <foldersAlwaysOnTop value="true" />
@@ -214,7 +237,7 @@
       <window_info anchor="bottom" id="Event Log" side_tool="true" />
       <window_info anchor="right" id="Maven Projects" />
       <window_info anchor="bottom" id="Run" order="2" />
-      <window_info anchor="bottom" id="Version Control" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Version Control" />
       <window_info anchor="bottom" id="Terminal" />
       <window_info id="Capture Tool" />
       <window_info id="Designer" />
@@ -238,7 +261,7 @@
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="8" />
+      <option name="time" value="9" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
@@ -273,12 +296,24 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/Processor.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="95">
-          <caret line="331" column="22" lean-forward="true" selection-start-line="331" selection-start-column="22" selection-end-line="331" selection-end-column="22" />
+        <state relative-caret-position="608">
+          <caret line="386" column="22" selection-start-line="386" selection-start-column="22" selection-end-line="386" selection-end-column="22" />
           <folding>
+            <element signature="e#12355#12473#0" />
+            <element signature="e#12483#12601#0" />
+            <element signature="e#12320#12430#0" />
+            <element signature="e#12056#12159#0" />
+            <element signature="e#11940#12035#0" />
+            <element signature="e#10932#11048#0" />
+            <element signature="e#11392#11665#0" />
+            <element signature="method#bitTest#0;class#Processor#0" />
+            <element signature="method#getStatus#0;class#Processor#0" />
+            <element signature="method#subtractWithCarry#0;class#Processor#0" />
+            <element signature="method#logicalShiftRight#0;class#Processor#0" />
             <element signature="method#xorAccumulator#0;class#Processor#0" />
             <element signature="method#decrementMemory#0;class#Processor#0" />
             <element signature="method#arithmeticShiftLeft#0;class#Processor#0" />
+            <element signature="method#branch#0;class#Processor#0" />
             <element signature="method#compareWithAccumulator#0;class#Processor#0" />
             <element signature="method#compareWithX#0;class#Processor#0" />
             <element signature="method#compareWithY#0;class#Processor#0" />
@@ -292,15 +327,15 @@
             <element signature="method#storeX#0;class#Processor#0" />
             <element signature="method#storeY#0;class#Processor#0" />
             <element signature="method#indirect#0;class#Processor#0" />
-            <element signature="e#32596#32597#0" expanded="true" />
-            <element signature="e#32652#32653#0" expanded="true" />
+            <element signature="e#42100#42101#0" expanded="true" />
+            <element signature="e#42156#42157#0" expanded="true" />
             <element signature="method#convertOperandsToAddress#1;class#Processor#0" />
-            <element signature="e#32865#32866#0" expanded="true" />
-            <element signature="e#32914#32915#0" expanded="true" />
+            <element signature="e#42369#42370#0" expanded="true" />
+            <element signature="e#42418#42419#0" expanded="true" />
             <element signature="method#indirectX#0;class#Processor#0" />
             <element signature="method#indirectY#0;class#Processor#0" />
-            <element signature="e#33271#33272#0" expanded="true" />
-            <element signature="e#33322#33323#0" expanded="true" />
+            <element signature="e#42775#42776#0" expanded="true" />
+            <element signature="e#42826#42827#0" expanded="true" />
             <element signature="method#isPageBoundaryCrossed#0;class#Processor#0" />
           </folding>
         </state>
