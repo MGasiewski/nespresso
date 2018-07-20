@@ -208,7 +208,7 @@ public class ProcessorTest {
 		assertFalse(processor.isZeroFlag());
 		assertTrue(processor.getXIndex() == 0xFF);
 	}
-	
+
 	@Test
 	public void deyTest() {
 		processor.runInstruction(0xA0, 0x1, 0);
@@ -218,5 +218,39 @@ public class ProcessorTest {
 		assertTrue(processor.isSignFlag());
 		assertFalse(processor.isZeroFlag());
 		assertTrue(processor.getYIndex() == 0xFF);
+	}
+
+	@Test
+	public void eorTest() { //Also tests indirect addressing
+		processor.runInstruction(0x49, 0b1111, 0); // EOR A=0 #$0b1111
+		assertTrue(processor.getAccumulator() == 0b1111);
+		processor.getMemory().setByte(0x1, 0b11110000);
+		processor.runInstruction(0x45, 0x01, 0); // EOR A=0b1111 mem addr = 0b11110000
+		assertTrue(processor.getAccumulator() == 0b11111111);
+		processor.runInstruction(0xA2, 0x5, 0); // LDX 0x5
+		processor.getMemory().setByte(0x5, 0b111100); // mem 5 = 0b111100
+		processor.runInstruction(0x55, 0x00, 0); // EOR A and mem 0 + xIndex (5)
+		assertTrue(processor.getAccumulator() == 0b11000011);
+		processor.getMemory().setByte(0x2010, 0b11110000);
+		processor.runInstruction(0x4D, 0x10, 0x20); // EOR A and mem 0x2010
+		assertTrue(processor.getAccumulator() == 0b00110011);
+		processor.getMemory().setByte(0x3005, 0b11111111);
+		processor.runInstruction(0x5D, 0x00, 0x30); // EOR A and mem 0x300 + 0x5
+		assertTrue(processor.getAccumulator() == 0b11001100);
+		processor.getMemory().setByte(0x15, 0b11111111);
+		processor.getMemory().setByte(0xA, 0x15);
+		processor.getMemory().setByte(0xB, 0x00);
+		processor.runInstruction(0x41, 0x5, 0); // EOR (0x5)
+		assertTrue(processor.getAccumulator() == 0b00110011);
+		processor.runInstruction(0xA0, 0x5, 0); // LDY 0x5
+		processor.getMemory().setByte(0x00, 0x10);
+		processor.getMemory().setByte(0x01, 0x00);
+		processor.runInstruction(0x51, 0x00, 0); // EOR y index (0x00)
+		assertTrue(processor.getAccumulator() == 0b11001100);
+	}
+	
+	@Test
+	public void jmpTest() {
+		
 	}
 }

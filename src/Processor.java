@@ -738,20 +738,20 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0x55:
-			accumulator = accumulator ^ zeroPageWithOffset(operand0, xIndex);
+			accumulator = accumulator ^ memory.getByte(zeroPageWithOffset(operand0, xIndex));
 			currentCycles = 4;
 			break;
 		case 0x4D:
-			accumulator = accumulator ^ zeroPageWithOffset(operand0, yIndex);
-			currentCycles = 4;
-			break;
-		case 0x5D:
-			accumulator = accumulator ^ convertOperandsToAddress(operand0, operand1);
+			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1));
 			currentCycles = 4;
 			// TODO page boundary cycle
 			break;
+		case 0x5D:
+			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			// TODO page boundary cycle
+			break;
 		case 0x59:
-			accumulator = accumulator ^ convertOperandsToAddress(operand0, operand1, xIndex);
+			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
 			// TODO page boundary cycle
 			break;
 		case 0x41:
