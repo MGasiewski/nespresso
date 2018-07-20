@@ -6,6 +6,6 @@ public class Memory {
     }
 
     public void setByte(int address, int value){
-
+        cpuMemory[address] = value;
     }
 }
