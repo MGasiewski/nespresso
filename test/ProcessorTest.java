@@ -29,9 +29,9 @@ public class ProcessorTest {
 		processor.getMemory().setByte(0x6050, 0xFF);
 		processor.runInstruction(0x6D, 0x50, 0x60);
 		assertTrue(processor.isCarryFlag());
-		assertTrue(processor.getAccumulator() == 0x25);
+		assertTrue(processor.getAccumulator() == 0x24);
 		processor.runInstruction(0x69, 0x10, -1);
-		assertTrue(processor.getAccumulator() == 0x25 + 0x10 + 0x1);
+		assertTrue(processor.getAccumulator() == 0x24 + 0x10 + 0x1);
 	}
 
 	@Test
@@ -54,10 +54,12 @@ public class ProcessorTest {
 		init();
 		processor.runInstruction(0xA2, 0x3, -1);
 		processor.runInstruction(0x1E, 0x02, 0x00);
-		assertTrue(processor.getMemory().getByte(0x5) == 0b11100001);
+		assertTrue(processor.getMemory().getByte(0x5) == 0b11100000);
+		assertTrue(processor.isCarryFlag());
 		processor.runInstruction(0xA2, 0x10, -1);
 		processor.runInstruction(0x16, 0x0, -1);
-		assertTrue(processor.getMemory().getByte(0x10) == 0b01010101);
+		assertTrue(processor.getMemory().getByte(0x10) == 0b01010100);
+		assertTrue(processor.isCarryFlag());
 	}
 
 	@Test
@@ -221,7 +223,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void eorTest() { //Also tests indirect addressing
+	public void eorTest() { // Also tests indirect addressing
 		processor.runInstruction(0x49, 0b1111, 0); // EOR A=0 #$0b1111
 		assertTrue(processor.getAccumulator() == 0b1111);
 		processor.getMemory().setByte(0x1, 0b11110000);
@@ -248,9 +250,76 @@ public class ProcessorTest {
 		processor.runInstruction(0x51, 0x00, 0); // EOR y index (0x00)
 		assertTrue(processor.getAccumulator() == 0b11001100);
 	}
-	
+
+	@Test
+	public void incTest() {
+		processor.getMemory().setByte(0x10, 0x10);
+		processor.runInstruction(0xE6, 0x10, 0);
+		assertTrue(processor.getMemory().getByte(0x10) == 0x11);
+		processor.getMemory().setByte(0x11, 0xFF);
+		processor.runInstruction(0xE6, 0x11, 0);
+		assertTrue(processor.isZeroFlag());
+		assertTrue(processor.getMemory().getByte(0x11) == 0x00);
+	}
+
+	@Test
+	public void inxTest() {
+		processor.runInstruction(0xA2, 0x10, 0);
+		processor.runInstruction(0xE8, 0, 0);
+		assertTrue(processor.getXIndex() == 0x11);
+	}
+
+	@Test
+	public void inyTest() {
+		processor.runInstruction(0xA0, 0xFF, 0);
+		processor.runInstruction(0xC8, 0, 0);
+		assertTrue(processor.getYIndex() == 0x00);
+		assertTrue(processor.isZeroFlag());
+	}
+
 	@Test
 	public void jmpTest() {
-		
+		processor.getMemory().setByte(0x00, 0xFF);
+		processor.getMemory().setByte(0x01, 0xAA);
+		processor.runInstruction(0x4C, 0x50, 0x00); // JMP $0000
+		assertTrue(processor.getProgramCounter() == 0x0050);
+		processor.runInstruction(0x6C, 0x00, 0x00);
+		assertTrue(processor.getProgramCounter() == 0xAAFF);
 	}
+
+	@Test
+	public void nopTest() {
+		processor.runInstruction(0xEA, 0, 0);
+		assertTrue(processor.getCurrentCycles() == 2);
+	}
+	
+	@Test
+	public void oraTest() {
+		processor.runInstruction(0xA9, 0b10101010, 0);
+		processor.runInstruction(0x09, 0b11110000, 0);
+		assertTrue(processor.getAccumulator() == 0b11111010);
+		assertTrue(processor.isSignFlag());
+		processor.getMemory().setByte(0x10, 0b00000001);
+		processor.runInstruction(0x05, 0x10, 0);
+		assertTrue(processor.getAccumulator() == 0b11111011);
+	}
+	
+	@Test
+	public void phaPlaTest() {
+		processor.runInstruction(0xA9, 0xF0, 0);
+		processor.runInstruction(0x48, 0, 0);
+		processor.runInstruction(0xA9, 0x00, 0);
+		assertTrue(processor.getAccumulator() == 0x00);
+		processor.runInstruction(0x68, 0, 0);
+		assertTrue(processor.getAccumulator() == 0xF0);
+	}
+
+	/*
+	 * @Test public void jsrTxsTest() { processor.runInstruction(0x4C, 0x50, 0x50);
+	 * processor.runInstruction(0xA2, 0xFF, 0); //LDX 0xFF
+	 * processor.runInstruction(0x9A, 0, 0); //TXS processor.runInstruction(0x20,
+	 * 0x00, 0x30); // JSR $3000 assertTrue(processor.getStackPointer() == 0xFD);
+	 * assertTrue(processor.getMemory().getByte(0xFF) == 0x50); }
+	 */
+
 }

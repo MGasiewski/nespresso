@@ -318,14 +318,14 @@ public class Processor {
 			break;
 		// INX - Increment x index
 		case 0xE8:
-			xIndex++;
+			xIndex = (xIndex + 1) % 0x100;
 			currentCycles = 2;
 			zeroFlag = xIndex == 0;
 			signFlag = xIndex >> 7 == 1;
 			break;
 		// INY - Increment y index
 		case 0xC8:
-			yIndex++;
+			yIndex = (yIndex + 1) % 0x100;
 			currentCycles = 2;
 			zeroFlag = yIndex == 0;
 			signFlag = yIndex >> 7 == 1;
@@ -382,22 +382,22 @@ public class Processor {
 			break;
 		// PHA - Push Accumulator
 		case 0x48:
-			memory.setByte(stackPointer--, accumulator);
+			push(accumulator);
 			currentCycles = 3;
 			break;
 		// PHP - Push Processor Status
 		case 0x08:
-			memory.setByte(stackPointer, getStatus());
+			push(getStatus());
 			currentCycles = 3;
 			break;
 		// PLA - Pull Accumulator
 		case 0x68:
-			accumulator = memory.getByte(stackPointer++);
+			accumulator = pop();
 			currentCycles = 4;
 			break;
 		// PLP - Pull Processor Status
 		case 0x28:
-			int status = memory.getByte(stackPointer++);
+			int status = pop();
 			setProcessorFlags(status);
 			currentCycles = 4;
 			break;
@@ -417,6 +417,16 @@ public class Processor {
 		// TODO handle cycles
 	}
 
+	private void push(int operand) {
+		memory.setByte(stackPointer, operand);
+		stackPointer -= 1;
+	}
+	
+	private int pop() {
+		stackPointer += 1;
+		return memory.getByte(stackPointer);
+	}
+	
 	private void rotateRight(int opcode, int operand0, int operand1) {
 		int original = 0;
 		int result = 0;
@@ -485,16 +495,16 @@ public class Processor {
 	}
 
 	private void returnFromSubroutine() {
-		int highByte = memory.getByte(stackPointer++);
-		int lowByte = memory.getByte(stackPointer++);
+		int highByte = pop();
+		int lowByte = pop();
 		programCounter = highByte * ENDIAN_MULT + lowByte;
 	}
 
 	private void returnFromInterrupt() {
-		int status = memory.getByte(stackPointer++);
+		int status = pop();
 		setProcessorFlags(status);
-		int highByte = memory.getByte(stackPointer++);
-		int lowByte = memory.getByte(stackPointer++);
+		int highByte = pop();
+		int lowByte = pop();
 		programCounter = highByte * ENDIAN_MULT + lowByte;
 	}
 
@@ -566,12 +576,12 @@ public class Processor {
 	private void brk() { // TODO
 		programCounter++;
 		int highByte = programCounter >> 8;
-		int lowByte = programCounter % 0xFF;
-		memory.setByte(stackPointer--, highByte);
-		memory.setByte(stackPointer--, lowByte);
+		int lowByte = programCounter % 0x100;
+		push(highByte);
+		push(lowByte);
 		softwareInterruptFlag = true;
 		// does Processor status change?
-		memory.setByte(stackPointer--, getStatus());
+		push(getStatus());
 		programCounter = 0;
 		programCounter = memory.getByte(0xFFFF) * ENDIAN_MULT;
 		programCounter += memory.getByte(0xFFFE);
@@ -818,26 +828,26 @@ public class Processor {
 		switch (opcode) {
 		case 0x0A:
 			beginValue = accumulator;
-			endValue = (beginValue << 1) % 0xFF;
+			endValue = (beginValue << 1) % 0x100;
 			accumulator = endValue;
 			break;
 		case 0x06:
 			beginValue = memory.getByte(operand0);
-			endValue = (beginValue << 1) % 0xFF;
+			endValue = (beginValue << 1) % 0x100;
 			memory.setByte(operand0, endValue);
 			break;
 		case 0x16:
 			beginValue = memory.getByte(zeroPageWithOffset(operand0, xIndex));
-			endValue = (beginValue << 1) % 0xFF;
+			endValue = (beginValue << 1) % 0x100;
 			memory.setByte(zeroPageWithOffset(operand0, xIndex), endValue);
 			break;
 		case 0x0E:
 			beginValue = memory.getByte(convertOperandsToAddress(operand0, operand1));
-			endValue = (beginValue << 1) % 0xFF;
+			endValue = (beginValue << 1) % 0x100;
 			memory.setByte(convertOperandsToAddress(operand0, operand1), endValue);
 		case 0x1E:
 			beginValue = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
-			endValue = (beginValue << 1) % 0xFF;
+			endValue = (beginValue << 1) % 0x100;
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), endValue);
 			break;
 		default:
@@ -845,6 +855,8 @@ public class Processor {
 		}
 		if (beginValue >> 7 == 1) {
 			carryFlag = true;
+		} else {
+			carryFlag = false; // Not explicitly documented
 		}
 		zeroFlag = endValue == 0;
 		signFlag = endValue >> 7 == 1;
@@ -853,7 +865,7 @@ public class Processor {
 	private void branch(boolean condition, int displacement) {
 		if (condition) {
 			currentCycles = 3;
-			if (programCounter % 0xFF + displacement > 0xFF) {
+			if (programCounter % 0x100 + displacement > 0xFF) {
 				currentCycles += 1;
 			}
 			programCounter += displacement;
@@ -967,28 +979,28 @@ public class Processor {
 		int newVal = -1;
 		switch (opcode) {
 		case 0xE6:
-			newVal = memory.getByte(operand0) + 1;
+			newVal = (memory.getByte(operand0) + 1) % 0x100;
 			memory.setByte(operand0, newVal);
 			currentCycles = 5;
 			break;
 		case 0xF6:
-			newVal = memory.getByte(operand0 + xIndex);
+			newVal = (memory.getByte(operand0 + xIndex)) % 0x100;
 			memory.setByte(operand0, newVal);
 			currentCycles = 6;
 			break;
 		case 0xEE:
-			newVal = memory.getByte(convertOperandsToAddress(operand0, operand1)) + 1;
+			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1)) + 1) % 0x100;
 			memory.setByte(convertOperandsToAddress(operand0, operand1), newVal);
 			currentCycles = 6;
 			break;
 		case 0xFE:
-			newVal = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)) + 1;
+			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)) + 1) % 0x100;
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), newVal);
 			currentCycles = 7;
 			break;
 		}
 		zeroFlag = newVal == 0;
-		signFlag = true;
+		signFlag = newVal >> 7 == 1;
 	}
 
 	private void loadIntoAccumulator(int opcode, int operand0, int operand1) {
@@ -1266,8 +1278,13 @@ public class Processor {
 	}
 
 	private int indirect(int operand0, int operand1) {
-		return memory.getByte(convertOperandsToAddress(operand0, operand1))
-				+ memory.getByte(convertOperandsToAddress(operand0, operand0, 1)) * ENDIAN_MULT;
+		if (operand0 != 0xFF) {
+			return memory.getByte(convertOperandsToAddress(operand0, operand1))
+					+ memory.getByte(convertOperandsToAddress(operand0, operand0, 1)) * ENDIAN_MULT;
+		} else {
+			return memory.getByte(convertOperandsToAddress(operand0, operand1))
+					+ memory.getByte(convertOperandsToAddress(0x00, operand1) * ENDIAN_MULT);
+		}
 	}
 
 	private int convertOperandsToAddress(int operand0, int operand1) {
@@ -1279,7 +1296,7 @@ public class Processor {
 	}
 
 	private int zeroPageWithOffset(int operand0, int offset) {
-		return (operand0 + offset) % 0xFF;
+		return (operand0 + offset) % 0x100;
 	}
 
 	private int indirectX(int operand0) {
@@ -1296,7 +1313,7 @@ public class Processor {
 		if (result > 0xFF) {
 			carryFlag = true;
 		}
-		return result % 0xFF;
+		return result % 0x100;
 	}
 
 	private boolean isPageBoundaryCrossed(int address, int offset) {
