@@ -1,17 +1,17 @@
 package nespresso.processing;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
-import com.sun.tools.javac.util.List;
+import java.util.ArrayList;
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import nespresso.controllers.NesController;
 import nespresso.exceptions.IncorrectOpcodeException;
 import nespresso.exceptions.UnknownOpcodeException;
 import nespresso.memory.Memory;
 
+@Slf4j
 public class Processor implements Runnable {
 	@Getter
 	private int accumulator = 0;
@@ -43,15 +43,37 @@ public class Processor implements Runnable {
 	private Memory memory;
 	@Getter
 	private int currentCycles = 0;
+	private List<String> operationCache = new ArrayList<>();
 
 	public void outputState() {
-		System.out.println("A: " + Integer.toHexString(accumulator) + " X: " + Integer.toHexString(xIndex) + " Y: "
+		log.info("A: " + Integer.toHexString(accumulator) + " X: " + Integer.toHexString(xIndex) + " Y: "
 				+ Integer.toHexString(yIndex));
-		System.out.println("PC: " + Integer.toHexString(programCounter) + " SP: " + Integer.toHexString(stackPointer));
-		System.out.println("Status: " + Integer.toBinaryString(getStatus()));
-		System.out.println();
+		log.info("PC: " + Integer.toHexString(programCounter) + " SP: " + Integer.toHexString(stackPointer));
+		log.info("Status: " + Integer.toBinaryString(getStatus()));
 	}
 
+	public void cacheOperation(int opcode) {
+		if (operationCache.size() > 10) {
+			operationCache.remove(0);
+		}
+		operationCache.add(Integer.toHexString(opcode));
+	}
+	
+	public void cacheOperation(int opcode, int operand) {
+		if (operationCache.size() > 10) {
+			operationCache.remove(0);
+		}
+		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand));
+	}
+
+	public void cacheOperation(int opcode, int operand0, int operand1) {
+		if (operationCache.size() > 10) {
+			operationCache.remove(0);
+		}
+		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand0) + " " + Integer.toHexString(operand1));
+	}
+
+	
 	public void runInstruction(int opcode, int operand0, int operand1)
 			throws UnknownOpcodeException, IncorrectOpcodeException {
 		switch (opcode) {
@@ -427,7 +449,7 @@ public class Processor implements Runnable {
 	}
 
 	public void jumpToSubroutine(int operand0, int operand1) {
-		int returnPoint = programCounter + 2;
+		int returnPoint = programCounter - 1;
 		push((returnPoint & 0xFF00) >> 8);
 		push(returnPoint & 0xFF);
 		currentCycles = 6;
@@ -554,9 +576,10 @@ public class Processor implements Runnable {
 	}
 
 	private void returnFromSubroutine() {
-		int highByte = pop();
 		int lowByte = pop();
+		int highByte = pop();
 		programCounter = highByte * ENDIAN_MULT + lowByte;
+		programCounter += 1;
 	}
 
 	private void returnFromInterrupt() {
@@ -940,9 +963,14 @@ public class Processor implements Runnable {
 	}
 
 	private void branch(boolean condition, int displacement) {
+		if (displacement >> 7 == 1) {
+			displacement -= 1;
+			displacement ^= 0xFF;
+			displacement *= -1;
+		}
 		if (condition) {
 			currentCycles = 3;
-			if (programCounter % 0x100 + displacement > 0xFF) {
+			if ((programCounter & 0xFF) + displacement > 0xFF) {
 				currentCycles += 1;
 			}
 			programCounter += displacement;
@@ -1401,21 +1429,25 @@ public class Processor implements Runnable {
 			try {
 				if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
+					cacheOperation(opcode);
 					runInstruction(opcode, 0, 0);
 				} else if (OpcodeLookup.twoByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand = memory.getByte(programCounter++);
+					cacheOperation(opcode, operand);
 					runInstruction(opcode, operand, 0);
 				} else if (OpcodeLookup.threeByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand0 = memory.getByte(programCounter++);
 					int operand1 = memory.getByte(programCounter++);
+					cacheOperation(opcode, operand0, operand1);
 					runInstruction(opcode, operand0, operand1);
-				}else {
+				} else {
 					throw new UnknownOpcodeException();
 				}
 			} catch (IncorrectOpcodeException | UnknownOpcodeException e) {
 				e.printStackTrace();
+				log.error("Most Recent Operations: " + operationCache);
 				throw new RuntimeException();
 			}
 			outputState();

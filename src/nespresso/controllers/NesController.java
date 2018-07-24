@@ -1,9 +1,11 @@
 package nespresso.controllers;
 
+import lombok.extern.slf4j.Slf4j;
 import nespresso.memory.Memory;
 import nespresso.processing.Clock;
 import nespresso.processing.Processor;
 
+@Slf4j
 public class NesController {
 	private Clock clock;
 	private Processor processor;
@@ -12,7 +14,8 @@ public class NesController {
 	public void initializeNes() {
 		clock = new Clock();
 		processor = new Processor();
-		memory = new Memory("a2 08 ca 8e 00 02 e0 03 d0 f8 8e 01 02 00");
+		memory = new Memory("20 09 00 20 0c 00 20 12 00 a2 00 60 e8 e0 05 d0"
+				+ " fb 60 00");
 		processor.setMemory(memory);
 		processor.run();
 	}

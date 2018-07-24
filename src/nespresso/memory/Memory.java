@@ -1,5 +1,9 @@
 package nespresso.memory;
 
+import lombok.extern.slf4j.Slf4j;
+import nespresso.controllers.NesController;
+
+@Slf4j
 public class Memory {
 	private int[] cpuMemory = new int[65536];
 
