@@ -3,6 +3,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import nespresso.exceptions.IncorrectOpcodeException;
+import nespresso.exceptions.UnknownOpcodeException;
+import nespresso.processing.Processor;
+
 public class ProcessorTest {
 	Processor processor = new Processor();
 
@@ -17,7 +21,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void adcTest() {
+	public void adcTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		// Tests Immediate and Indirect X
 		processor.runInstruction(0x69, 0x10, -1); // ADC #$10
 		processor.runInstruction(0x69, 0x5, -1); // ADC #$10
@@ -35,7 +39,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void andTest() {
+	public void andTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		init();
 		processor.runInstruction(0x69, 0x10, -1);
 		processor.runInstruction(0x25, 0x0, -1);
@@ -48,7 +52,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void aslTest() {
+	public void aslTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		// also tests LDX
 		// tests absolute x addressing
 		init();
@@ -63,7 +67,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bccTest() {
+	public void bccTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		int previous0 = processor.getProgramCounter();
 		processor.runInstruction(0x90, 0x50, -1);
 		assertTrue(processor.getProgramCounter() == previous0 + 0x50);
@@ -75,7 +79,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bcsSecClcTest() {
+	public void bcsSecClcTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		int previous = processor.getProgramCounter();
 		processor.runInstruction(0x38, -1, -1);
 		processor.runInstruction(0xB0, 0x1F, -1);
@@ -87,7 +91,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void beqTest() {
+	public void beqTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA, 0x0, -1);
 		int previous = processor.getProgramCounter();
 		processor.runInstruction(0xF0, 0x1F, -1);
@@ -99,7 +103,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bmiTest() {
+	public void bmiTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA9, 0b11111111, -1); // Load operand 0 into accumulator
 		processor.runInstruction(0xC9, 0b1, -1); // Compare accumulator with operand0 which should set neg flag
 		int previous = processor.getProgramCounter();
@@ -108,7 +112,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bneTest() {
+	public void bneTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA9, 0x05, 0); // set zero flag by executing LDA 0x05
 		int previous0 = processor.getProgramCounter();
 		processor.runInstruction(0xD0, 0x10, 0); // BNE 0x10
@@ -120,7 +124,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bplTest() {
+	public void bplTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA9, 0xFF, 0); // LDA #$FF - Set negative flag
 		int previous0 = processor.getProgramCounter();
 		processor.runInstruction(0x10, 0x15, 0); // BPL 0x15
@@ -128,7 +132,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bpcTest() {
+	public void bpcTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		int previous0 = processor.getProgramCounter();
 		processor.runInstruction(0x50, 0x10, 0); // BVC 0x10
 		assertTrue(previous0 + 0x10 == processor.getProgramCounter());
@@ -140,7 +144,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void cliSeiTest() {
+	public void cliSeiTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0x78, 0, 0); // Set Interrupt disable flag
 		assertTrue(processor.isInterruptFlag());
 		processor.runInstruction(0x58, 0, 0); // Clear Interrupt disable flag
@@ -153,7 +157,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void cmpTest() {
+	public void cmpTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xa9, 0x10, 0); // LDA 0x10
 		processor.getMemory().setByte(0x20, 0x10);
 		processor.getMemory().setByte(0x21, 0x3);
@@ -165,7 +169,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void cpxTest() {
+	public void cpxTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA2, 0x10, 0);
 		processor.getMemory().setByte(0x2010, 0x13);
 		processor.getMemory().setByte(0x2020, 0x5);
@@ -181,7 +185,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void cpyTest() {
+	public void cpyTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xC0, 0x0, 0);
 		assertTrue(processor.isZeroFlag());
 		assertTrue(processor.isCarryFlag());
@@ -193,7 +197,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void decTest() {
+	public void decTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.getMemory().setByte(0x100, 0x0);
 		processor.runInstruction(0xCE, 0x00, 0x01); // Decrement memory address 0x100
 		assertTrue(processor.isSignFlag());
@@ -201,7 +205,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void dexTest() {
+	public void dexTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA2, 0x1, 0);
 		processor.runInstruction(0xCA, 0, 0);
 		assertTrue(processor.isZeroFlag());
@@ -212,7 +216,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void deyTest() {
+	public void deyTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA0, 0x1, 0);
 		processor.runInstruction(0x88, 0, 0);
 		assertTrue(processor.isZeroFlag());
@@ -223,7 +227,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void eorTest() { // Also tests indirect addressing
+	public void eorTest() throws UnknownOpcodeException, IncorrectOpcodeException { // Also tests indirect addressing
 		processor.runInstruction(0x49, 0b1111, 0); // EOR A=0 #$0b1111
 		assertTrue(processor.getAccumulator() == 0b1111);
 		processor.getMemory().setByte(0x1, 0b11110000);
@@ -252,7 +256,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void incTest() {
+	public void incTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.getMemory().setByte(0x10, 0x10);
 		processor.runInstruction(0xE6, 0x10, 0);
 		assertTrue(processor.getMemory().getByte(0x10) == 0x11);
@@ -263,14 +267,14 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void inxTest() {
+	public void inxTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA2, 0x10, 0);
 		processor.runInstruction(0xE8, 0, 0);
 		assertTrue(processor.getXIndex() == 0x11);
 	}
 
 	@Test
-	public void inyTest() {
+	public void inyTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA0, 0xFF, 0);
 		processor.runInstruction(0xC8, 0, 0);
 		assertTrue(processor.getYIndex() == 0x00);
@@ -278,7 +282,7 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void jmpTest() {
+	public void jmpTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.getMemory().setByte(0x00, 0xFF);
 		processor.getMemory().setByte(0x01, 0xAA);
 		processor.runInstruction(0x4C, 0x50, 0x00); // JMP $0000
@@ -288,13 +292,13 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void nopTest() {
+	public void nopTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xEA, 0, 0);
 		assertTrue(processor.getCurrentCycles() == 2);
 	}
-	
+
 	@Test
-	public void oraTest() {
+	public void oraTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA9, 0b10101010, 0);
 		processor.runInstruction(0x09, 0b11110000, 0);
 		assertTrue(processor.getAccumulator() == 0b11111010);
@@ -303,9 +307,9 @@ public class ProcessorTest {
 		processor.runInstruction(0x05, 0x10, 0);
 		assertTrue(processor.getAccumulator() == 0b11111011);
 	}
-	
+
 	@Test
-	public void phaPlaTest() {
+	public void phaPlaTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		processor.runInstruction(0xA9, 0xF0, 0);
 		processor.runInstruction(0x48, 0, 0);
 		processor.runInstruction(0xA9, 0x00, 0);
@@ -314,12 +318,89 @@ public class ProcessorTest {
 		assertTrue(processor.getAccumulator() == 0xF0);
 	}
 
-	/*
-	 * @Test public void jsrTxsTest() { processor.runInstruction(0x4C, 0x50, 0x50);
-	 * processor.runInstruction(0xA2, 0xFF, 0); //LDX 0xFF
-	 * processor.runInstruction(0x9A, 0, 0); //TXS processor.runInstruction(0x20,
-	 * 0x00, 0x30); // JSR $3000 assertTrue(processor.getStackPointer() == 0xFD);
-	 * assertTrue(processor.getMemory().getByte(0xFF) == 0x50); }
-	 */
+	@Test
+	public void clcCldCliPhpPlpSecSedSeiTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0x38, 0, 0); // SEC - set carry flag
+		processor.runInstruction(0xF8, 0, 0); // SED - set decimal flag
+		processor.runInstruction(0x78, 0, 0); // SEI - set interrupt disable
+		assertTrue(processor.isCarryFlag());
+		assertTrue(processor.isDecimalModeFlag());
+		assertTrue(processor.isInterruptFlag());
+		processor.runInstruction(0x08, 0, 0); // PHP - push processor status
+		processor.runInstruction(0x18, 0, 0); // CLC - clear carry flag
+		processor.runInstruction(0xD8, 0, 0); // CLD - clear decimal flag
+		processor.runInstruction(0x58, 0, 0); // CLI - clear interrupt disable
+		assertFalse(processor.isCarryFlag());
+		assertFalse(processor.isDecimalModeFlag());
+		assertFalse(processor.isInterruptFlag());
+		processor.runInstruction(0x28, 0, 0);
+		assertTrue(processor.isCarryFlag());
+		assertTrue(processor.isDecimalModeFlag());
+		assertTrue(processor.isInterruptFlag());
+	}
+
+	@Test
+	public void taxTayTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0xA9, 0x15, 0);
+		processor.runInstruction(0xAA, 0, 0);
+		assertTrue(processor.getXIndex() == 0x15);
+		processor.runInstruction(0xA8, 0, 0);
+		assertTrue(processor.getYIndex() == 0x15);
+	}
+
+	@Test
+	public void rolTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0xA9, 0b10000001, 0);
+		processor.runInstruction(0x2A, 0, 0);
+		assertTrue(processor.isCarryFlag());
+		assertTrue(processor.getAccumulator() == 0b10);
+		processor.getMemory().setByte(0x10, 0b10000000);
+		processor.runInstruction(0x26, 0x10, 0);
+		assertTrue(processor.getMemory().getByte(0x10) == 0b1);
+		assertTrue(processor.isCarryFlag());
+	}
+
+	@Test
+	public void rorTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0x38, 0, 0); // SEC -- set carry
+		processor.runInstruction(0xA9, 0b00000011, 0); // LDA 0x3
+		processor.runInstruction(0x6A, 0, 0); // ROR accumulator
+		assertTrue(processor.isCarryFlag());
+		assertTrue(processor.getAccumulator() == 0b10000001);
+		processor.getMemory().setByte(0x2010, 0b11110000);
+		processor.runInstruction(0x6E, 0x10, 0x20);
+		assertTrue(processor.getMemory().getByte(0x2010) == 0b11111000);
+		assertFalse(processor.isCarryFlag());
+	}
+
+	@Test
+	public void stxStyTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0xA2, 0xF0, 0); // LDX 0xF0
+		processor.runInstruction(0xA0, 0x0F, 0); // LDY 0x0F
+			processor.runInstruction(0x8E, 0x10, 0x50);
+		processor.runInstruction(0x8C, 0x60, 0x10);
+		assertTrue(processor.getMemory().getByte(0x5010) == 0xF0);
+		assertTrue(processor.getMemory().getByte(0x1060) == 0x0F);
+	}
+	
+	public void tsxTxaTxsTyaTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		int originalSp = processor.getStackPointer();
+		processor.runInstruction(0xBA, 0, 0);
+		assertTrue(processor.getXIndex() == originalSp);
+		processor.runInstruction(0x8A, 0, 0);
+		assertTrue(processor.getAccumulator() == originalSp);
+		int value = 0xAA;
+		processor.runInstruction(0xA2, value, 0);
+		processor.runInstruction(0x9A, 0, 0);
+		assertTrue(processor.getStackPointer() == value);
+		processor.getMemory().setByte(0x2010, value);
+		processor.runInstruction(0xAC, 0x10, 0x20);
+		processor.runInstruction(0x98, 0, 0);
+		assertTrue(processor.getAccumulator() == value);
+	}
+
+	public void jsrRtiTest() {
+		
+	}
 
 }

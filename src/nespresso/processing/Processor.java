@@ -1,6 +1,18 @@
-import lombok.Getter;
+package nespresso.processing;
 
-public class Processor {
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import com.sun.tools.javac.util.List;
+
+import lombok.Getter;
+import lombok.Setter;
+import nespresso.exceptions.IncorrectOpcodeException;
+import nespresso.exceptions.UnknownOpcodeException;
+import nespresso.memory.Memory;
+
+public class Processor implements Runnable {
 	@Getter
 	private int accumulator = 0;
 	@Getter
@@ -8,7 +20,7 @@ public class Processor {
 	@Getter
 	private int yIndex = 0;
 	@Getter
-	private int stackPointer = 0;
+	private int stackPointer = 0xFF;
 	@Getter
 	private int programCounter = 0;
 	@Getter
@@ -20,20 +32,17 @@ public class Processor {
 	@Getter
 	private boolean decimalModeFlag = false;
 	@Getter
-	private boolean softwareInterruptFlag = false;
+	private boolean softwareInterruptFlag = true;
 	@Getter
 	private boolean overflowFlag = false;
 	@Getter
 	private boolean signFlag = false;
 	private static int ENDIAN_MULT = 256;
 	@Getter
-	private Memory memory = new Memory();
+	@Setter
+	private Memory memory;
 	@Getter
 	private int currentCycles = 0;
-
-	public static void main(String[] args) {
-
-	}
 
 	public void outputState() {
 		System.out.println("A: " + Integer.toHexString(accumulator) + " X: " + Integer.toHexString(xIndex) + " Y: "
@@ -43,7 +52,8 @@ public class Processor {
 		System.out.println();
 	}
 
-	public void runInstruction(int opcode, int operand0, int operand1) {
+	public void runInstruction(int opcode, int operand0, int operand1)
+			throws UnknownOpcodeException, IncorrectOpcodeException {
 		switch (opcode) {
 		// ASL - Arithmetic Shift Left
 		case 0x0A:
@@ -87,7 +97,7 @@ public class Processor {
 			break;
 		// JSR - Jump to subroutine
 		case 0x20:
-
+			jumpToSubroutine(operand0, operand1);
 			break;
 		// JMP
 		case 0x4C:
@@ -412,22 +422,29 @@ public class Processor {
 			currentCycles = 6;
 			break;
 		default:
-			break; // TODO add exception
+			throw new UnknownOpcodeException();
 		}
-		// TODO handle cycles
+	}
+
+	public void jumpToSubroutine(int operand0, int operand1) {
+		int returnPoint = programCounter + 2;
+		push((returnPoint & 0xFF00) >> 8);
+		push(returnPoint & 0xFF);
+		currentCycles = 6;
+		programCounter = operand0 + operand1 * ENDIAN_MULT;
 	}
 
 	private void push(int operand) {
-		memory.setByte(stackPointer, operand);
+		memory.setByte(stackPointer + 0x100, operand);
 		stackPointer -= 1;
 	}
-	
+
 	private int pop() {
 		stackPointer += 1;
-		return memory.getByte(stackPointer);
+		return memory.getByte(stackPointer + 0x100);
 	}
-	
-	private void rotateRight(int opcode, int operand0, int operand1) {
+
+	private void rotateRight(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int original = 0;
 		int result = 0;
 		switch (opcode) {
@@ -447,16 +464,38 @@ public class Processor {
 			original = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
 			break;
 		default:
-			break; // TODO add exception
+			throw new IncorrectOpcodeException();
 		}
 		result = original >> 1;
-		result += 0xFF + (original % 2);
-		accumulator = result;
+		result &= 0xFF;
+		result |= carryFlag ? 0b10000000 : 0;
+		switch (opcode) {
+		case 0x6A:
+			accumulator = result;
+			currentCycles = 2;
+			break;
+		case 0x66:
+			memory.setByte(operand0, result);
+			currentCycles = 5;
+			break;
+		case 0x76:
+			memory.setByte(zeroPageWithOffset(operand0, xIndex), result);
+			currentCycles = 6;
+			break;
+		case 0x6E:
+			memory.setByte(convertOperandsToAddress(operand0, operand1), result);
+			currentCycles = 6;
+			break;
+		case 0x7E:
+			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), result);
+			currentCycles = 7;
+			break;
+		default:
+			throw new IncorrectOpcodeException();
+		}
 		currentCycles = 2;
 		zeroFlag = accumulator == 0;
-		if (original >> 7 == 1) {
-			carryFlag = true;
-		}
+		carryFlag = (original & 0b00000001) == 1;
 		signFlag = result >> 7 == 1;
 	}
 
@@ -483,14 +522,34 @@ public class Processor {
 			break;
 		}
 		result = original << 1;
-		result %= 256;
-		result += original >> 7;
-		accumulator = result;
-		currentCycles = 2;
-		zeroFlag = accumulator == 0;
-		if (original >> 7 == 1) {
-			carryFlag = true;
+		result &= 0xFF;
+		result += carryFlag ? 1 : 0;
+		switch (opcode) {
+		case 0x2A:
+			accumulator = result;
+			currentCycles = 2;
+			break;
+		case 0x26:
+			memory.setByte(operand0, result);
+			currentCycles = 5;
+			break;
+		case 0x36:
+			memory.setByte(zeroPageWithOffset(operand0, xIndex), result);
+			currentCycles = 6;
+			break;
+		case 0x2E:
+			memory.setByte(convertOperandsToAddress(operand0, operand1), result);
+			currentCycles = 6;
+			break;
+		case 0x3E:
+			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), result);
+			currentCycles = 7;
+			break;
+		default:
+			break;
 		}
+		zeroFlag = accumulator == 0;
+		carryFlag = original >> 7 == 1;
 		signFlag = result >> 7 == 1;
 	}
 
@@ -525,7 +584,7 @@ public class Processor {
 		signFlag = status % 2 == 1;
 	}
 
-	private void logicalOr(int opcode, int operand0, int operand1) {
+	private void logicalOr(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		switch (opcode) {
 		case 0x09:
 			accumulator |= operand0;
@@ -567,13 +626,13 @@ public class Processor {
 			}
 			break;
 		default:
-			break; // TODO throw exception
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = accumulator == 0;
 		signFlag = accumulator >> 7 == 1;
 	}
 
-	private void brk() { // TODO
+	private void brk() {
 		programCounter++;
 		int highByte = programCounter >> 8;
 		int lowByte = programCounter % 0x100;
@@ -588,7 +647,7 @@ public class Processor {
 		currentCycles = 7;
 	}
 
-	private void bitTest(int opcode, int operand0, int operand1) {
+	private void bitTest(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int result = 0;
 		int mem = 0;
 		switch (opcode) {
@@ -603,7 +662,7 @@ public class Processor {
 			currentCycles = 4;
 			break;
 		default:
-			// TODO throw exception
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
 		if (mem >> 6 == 1) {
@@ -642,55 +701,77 @@ public class Processor {
 	}
 
 	private void subtractWithCarry(int opcode, int operand0, int operand1) {
+		int borrow = carryFlag ? 0 : 1;
+		int minuend = accumulator;
+		int subtrahend = 0;
 		switch (opcode) {
 		case 0xE9:
-			accumulator = accumulator - operand0;
+			subtrahend = operand0;
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 2;
 			break;
 		case 0xE5:
-			accumulator = accumulator - memory.getByte(operand0);
+			subtrahend = memory.getByte(operand0);
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 3;
 			break;
 		case 0xF5:
-			accumulator = accumulator - memory.getByte(zeroPageWithOffset(operand0, xIndex));
+			subtrahend = memory.getByte(zeroPageWithOffset(operand0, xIndex));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 4;
 			break;
 		case 0xED:
-			accumulator = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1));
+			subtrahend = memory.getByte(convertOperandsToAddress(operand0, operand1));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 4;
 			break;
 		case 0xFD:
-			accumulator = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			subtrahend = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 4;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
 				currentCycles += 1;
 			}
 			break;
 		case 0xF9:
-			accumulator = accumulator - memory.getByte(indirectX(operand0));
+			subtrahend = memory.getByte(indirectX(operand0));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 4;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
 				currentCycles += 1;
 			}
 			break;
 		case 0xE1:
-			accumulator = accumulator - memory.getByte(indirectX(operand0));
+			subtrahend = memory.getByte(indirectX(operand0));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 6;
 			break;
 		case 0xF1:
-			accumulator = accumulator - memory.getByte(indirectY(operand0));
+			subtrahend = memory.getByte(indirectY(operand0));
+			accumulator -= subtrahend;
+			accumulator -= borrow;
 			currentCycles = 5;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand1 + 1)),
 					yIndex)) {
 				currentCycles += 1;
 			}
 		default:
-			break; // TODO add exception
+			break;
 		}
-		// TODO implement flag handling
-	} // TODO flag handling
+		carryFlag = minuend >= subtrahend;
+		signFlag = accumulator >> 7 == 1;
+		zeroFlag = accumulator == 0;
+		overflowFlag = false; // TODO figure out and implementation for this
+	}
 
-	private void logicalShiftRight(int opcode, int operand0, int operand1) {
+	private void logicalShiftRight(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int previous = 0;
 		int result = 0;
 		switch (opcode) {
@@ -725,8 +806,7 @@ public class Processor {
 			currentCycles = 7;
 			break;
 		default:
-			// TODO exception
-			break;
+			throw new IncorrectOpcodeException();
 		}
 		if (previous % 2 == 0) {
 			carryFlag = false;
@@ -737,7 +817,7 @@ public class Processor {
 		signFlag = result >> 7 == 1;
 	}
 
-	private void xorAccumulator(int opcode, int operand0, int operand1) {
+	private void xorAccumulator(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		switch (opcode) {
 		case 0x49:
 			accumulator = accumulator ^ operand0;
@@ -754,15 +834,14 @@ public class Processor {
 		case 0x4D:
 			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1));
 			currentCycles = 4;
-			// TODO page boundary cycle
 			break;
 		case 0x5D:
 			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
-			// TODO page boundary cycle
+			currentCycles = isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex) ? 5 : 4;
 			break;
 		case 0x59:
 			accumulator = accumulator ^ memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
-			// TODO page boundary cycle
+			currentCycles = isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex) ? 5 : 4;
 			break;
 		case 0x41:
 			accumulator = accumulator ^ memory.getByte(indirectX(operand0));
@@ -770,16 +849,15 @@ public class Processor {
 			break;
 		case 0x51:
 			accumulator = accumulator ^ memory.getByte(indirectY(operand0));
-			currentCycles = 5;
-			// TODO page boundary cycle
+			currentCycles = isPageBoundaryCrossed(
+					convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand0 + 1)), yIndex) ? 6 : 5;
 			break;
 		default:
-			// TODO throw exception
-			break;
+			throw new IncorrectOpcodeException();
 		}
 	}
 
-	private void decrementMemory(int opcode, int operand0, int operand1) {
+	private void decrementMemory(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int result = 0;
 		switch (opcode) {
 		case 0xC6:
@@ -807,8 +885,7 @@ public class Processor {
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), result);
 			break;
 		default:
-			// TODO throw exception
-			break;
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
 		signFlag = result >> 7 == 1;
@@ -822,7 +899,7 @@ public class Processor {
 		}
 	}
 
-	private void arithmeticShiftLeft(int opcode, int operand0, int operand1) {
+	private void arithmeticShiftLeft(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int beginValue = 0;
 		int endValue = 0;
 		switch (opcode) {
@@ -851,7 +928,7 @@ public class Processor {
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), endValue);
 			break;
 		default:
-			// TODO throw exception
+			throw new IncorrectOpcodeException();
 		}
 		if (beginValue >> 7 == 1) {
 			carryFlag = true;
@@ -874,7 +951,7 @@ public class Processor {
 		}
 	}
 
-	private void compareWithAccumulator(int opcode, int operand0, int operand1) {
+	private void compareWithAccumulator(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int result = 0;
 		switch (opcode) {
 		case 0xC9:
@@ -886,7 +963,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0xD5:
-			result = accumulator - memory.getByte(operand0 + xIndex); // TODO how to handle overflow?
+			result = accumulator - memory.getByte(operand0 + xIndex);
 			currentCycles = 4;
 			break;
 		case 0xCD:
@@ -894,15 +971,12 @@ public class Processor {
 			currentCycles = 4;
 			break;
 		case 0xDD:
-			result = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)); // TODO handle
-																											// boundary
-			currentCycles = 4;
+			result = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			currentCycles = isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex) ? 5 : 4;
 			break;
 		case 0xD9:
-			result = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex)); // TODO handle
-																											// page
-																											// boundary
-			currentCycles = 6;
+			result = accumulator - memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
+			currentCycles = isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex) ? 5 : 4;
 			break;
 		case 0xC1:
 			result = accumulator - memory.getByte(indirectX(operand0));
@@ -910,10 +984,11 @@ public class Processor {
 			break;
 		case 0xD1:
 			result = accumulator - memory.getByte(indirectY(operand0));
+			currentCycles = isPageBoundaryCrossed(
+					convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand0 + 1)), yIndex) ? 6 : 5;
 			break;
 		default:
-			// TODO exception
-			break;
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
 		carryFlag = result >= 0;
@@ -923,7 +998,7 @@ public class Processor {
 		signFlag = result >> 7 == 1;
 	}
 
-	private void compareWithX(int opcode, int operand0, int operand1) {
+	private void compareWithX(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int result = 0;
 		switch (opcode) {
 		case 0xE0:
@@ -939,7 +1014,7 @@ public class Processor {
 			currentCycles = 4;
 			break;
 		default:
-			break; // TODO add exception
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
 		carryFlag = result >= 0;
@@ -949,7 +1024,7 @@ public class Processor {
 		signFlag = result >> 7 == 1;
 	}
 
-	private void compareWithY(int opcode, int operand0, int operand1) {
+	private void compareWithY(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
 		int result = 0;
 		switch (opcode) {
 		case 0xC0:
@@ -965,7 +1040,7 @@ public class Processor {
 			currentCycles = 4;
 			break;
 		default:
-			break; // TODO add exception
+			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
 		carryFlag = result >= 0;
@@ -1166,7 +1241,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0x95: // Zero Page X Offset
-			memory.setByte(operand0 + xIndex, accumulator);
+			memory.setByte(zeroPageWithOffset(operand0, xIndex), accumulator);
 			currentCycles = 4;
 			break;
 		case 0x8D:
@@ -1318,5 +1393,32 @@ public class Processor {
 
 	private boolean isPageBoundaryCrossed(int address, int offset) {
 		return address % 0x100 > (address + offset) % 0x100;
+	}
+
+	@Override
+	public void run() {
+		while (memory.getByte(programCounter) != 0x00) {
+			try {
+				if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
+					int opcode = memory.getByte(programCounter++);
+					runInstruction(opcode, 0, 0);
+				} else if (OpcodeLookup.twoByteOpcodes.contains(memory.getByte(programCounter))) {
+					int opcode = memory.getByte(programCounter++);
+					int operand = memory.getByte(programCounter++);
+					runInstruction(opcode, operand, 0);
+				} else if (OpcodeLookup.threeByteOpcodes.contains(memory.getByte(programCounter))) {
+					int opcode = memory.getByte(programCounter++);
+					int operand0 = memory.getByte(programCounter++);
+					int operand1 = memory.getByte(programCounter++);
+					runInstruction(opcode, operand0, operand1);
+				}else {
+					throw new UnknownOpcodeException();
+				}
+			} catch (IncorrectOpcodeException | UnknownOpcodeException e) {
+				e.printStackTrace();
+				throw new RuntimeException();
+			}
+			outputState();
+		}
 	}
 }
