@@ -14,6 +14,9 @@ public class Memory {
     	}
     }
 
+	public Memory() {
+	}
+
 	public int getByte(int address) {
 		return cpuMemory[address];
 	}
