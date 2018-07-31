@@ -38,16 +38,17 @@ public class NromMapper extends Memory {
 					
 				}else if(count > 15 && count < 16384 * sixteenKbPrgUnits + 15) {
 					if(sixteenKbPrgUnits == 1) {
-						int address0 = count - 15 + 0x8000;
-						int address1 = count - 15 + 0xC000;
+						int address0 = count - 16 + 0x8000;
+						int address1 = count - 16 + 0xC000;
 						setByte(address0, i);
 						setByte(address1, i);
 					}else{
-						int address = count - 15 + 0x8000;
+						int address = count - 16 + 0x8000;
 						setByte(address, i);
 					}					
-				}else if(16384 * sixteenKbPrgUnits + 15 > count) {
-					//TODO load CHR
+				}else if(16384 * sixteenKbPrgUnits + 15 < count) {
+					int ppuIndex = count - (16384 * sixteenKbPrgUnits + 16 );
+					ppu.setByte(ppuIndex, i);
 				}
 				count += 1;
 			}

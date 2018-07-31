@@ -3,6 +3,8 @@ package nespresso.processing;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.management.RuntimeErrorException;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +45,35 @@ public class Processor implements Runnable {
 	private Memory memory;
 	@Getter
 	private int currentCycles = 0;
+	@Getter
+	@Setter
+	private Clock clock;
 	private List<String> operationCache = new ArrayList<>();
+
+	public Processor(Memory memory) {
+		setMemory(memory);
+		for (int i = 0; i < 0x800; ++i) {
+			memory.setByte(i, 0xFF);
+		}
+		memory.setByte(0x0008, 0xF7);
+		memory.setByte(0x0009, 0xEF);
+		memory.setByte(0x000A, 0xDF);
+		memory.setByte(0x000B, 0xBF);
+
+		for (int i = 0x4000; i <= 0x400F; ++i) {
+			memory.setByte(i, 0x00);
+		}
+
+		memory.setByte(0x4015, 0);
+		memory.setByte(0x4017, 0);
+
+		accumulator = 0;
+		xIndex = 0;
+		yIndex = 0;
+		stackPointer = 0xFD;
+		programCounter = indirect(0xFC, 0xFF);
+
+	}
 
 	public void outputState() {
 		log.info("A: " + Integer.toHexString(accumulator) + " X: " + Integer.toHexString(xIndex) + " Y: "
@@ -52,13 +82,17 @@ public class Processor implements Runnable {
 		log.info("Status: " + Integer.toBinaryString(getStatus()));
 	}
 
+	public void outputCache() {
+		System.out.println(operationCache);
+	}
+
 	public void cacheOperation(int opcode) {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
 		}
 		operationCache.add(Integer.toHexString(opcode));
 	}
-	
+
 	public void cacheOperation(int opcode, int operand) {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
@@ -70,10 +104,10 @@ public class Processor implements Runnable {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
 		}
-		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand0) + " " + Integer.toHexString(operand1));
+		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand0) + " "
+				+ Integer.toHexString(operand1));
 	}
 
-	
 	public void runInstruction(int opcode, int operand0, int operand1)
 			throws UnknownOpcodeException, IncorrectOpcodeException {
 		switch (opcode) {
@@ -1383,7 +1417,7 @@ public class Processor implements Runnable {
 	private int indirect(int operand0, int operand1) {
 		if (operand0 != 0xFF) {
 			return memory.getByte(convertOperandsToAddress(operand0, operand1))
-					+ memory.getByte(convertOperandsToAddress(operand0, operand0, 1)) * ENDIAN_MULT;
+					+ memory.getByte(convertOperandsToAddress(operand0, operand1, 1)) * ENDIAN_MULT;
 		} else {
 			return memory.getByte(convertOperandsToAddress(operand0, operand1))
 					+ memory.getByte(convertOperandsToAddress(0x00, operand1) * ENDIAN_MULT);
@@ -1447,10 +1481,34 @@ public class Processor implements Runnable {
 				}
 			} catch (IncorrectOpcodeException | UnknownOpcodeException e) {
 				e.printStackTrace();
+				log.error("Unrecognized Opcode: {}", Integer.toHexString(memory.getByte(programCounter)));
 				log.error("Most Recent Operations: " + operationCache);
 				throw new RuntimeException();
 			}
-			outputState();
+			if (accumulator > 0xFF) {
+				log.error("Critical error, accumulator has an invalid value: {}", Integer.toHexString(accumulator));
+				log.error("Most recent operations: {}", operationCache);
+				throw new RuntimeException();
+			} else if (xIndex > 0xFF) {
+				log.error("Critical error, x index has an invalid value: {}", Integer.toHexString(xIndex));
+				log.error("Most recent operations: {}", operationCache);
+				throw new RuntimeException();
+			} else if (yIndex > 0xFF) {
+				log.error("Critical error, y index has an incorrect value: {}", Integer.toHexString(yIndex));
+				log.error("Most recent operations: {}", operationCache);
+				throw new RuntimeException();
+			} else if (stackPointer > 0xFF) {
+				log.error("Critical error, stack pointer has an incorrect value: {}",
+						Integer.toHexString(stackPointer));
+				log.error("Most recent operations: {}", operationCache);
+				throw new RuntimeException();
+			} else if (programCounter > 0xFFFF) {
+				log.error("Critical error, program counter has an incorrect value: {}",
+						Integer.toHexString(programCounter));
+				log.error("Most recent operations: {}", operationCache);
+				throw new RuntimeException();
+			}
+			clock.registerCycles(currentCycles);
 		}
 	}
 }

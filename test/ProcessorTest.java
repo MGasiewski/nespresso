@@ -5,10 +5,12 @@ import org.junit.Test;
 
 import nespresso.exceptions.IncorrectOpcodeException;
 import nespresso.exceptions.UnknownOpcodeException;
+import nespresso.memory.Memory;
 import nespresso.processing.Processor;
 
 public class ProcessorTest {
-	Processor processor = new Processor();
+	Memory memory = new Memory();
+	Processor processor = new Processor(memory);
 
 	private void init() {
 		processor.getMemory().setByte(0x000, 0xFF);
