@@ -14,7 +14,10 @@ import nespresso.exceptions.UnknownOpcodeException;
 import nespresso.memory.Memory;
 
 @Slf4j
-public class Processor implements Runnable {
+public class Processor {
+	@Getter
+	@Setter
+	private boolean nmi;
 	@Getter
 	private int accumulator = 0;
 	@Getter
@@ -47,7 +50,7 @@ public class Processor implements Runnable {
 	private int currentCycles = 0;
 	@Getter
 	@Setter
-	private Clock clock;
+	private PictureProcessingUnit ppu;
 	private List<String> operationCache = new ArrayList<>();
 
 	public Processor(Memory memory) {
@@ -72,6 +75,7 @@ public class Processor implements Runnable {
 		yIndex = 0;
 		stackPointer = 0xFD;
 		programCounter = indirect(0xFC, 0xFF);
+		// programCounter = 0xC000;
 
 	}
 
@@ -619,8 +623,8 @@ public class Processor implements Runnable {
 	private void returnFromInterrupt() {
 		int status = pop();
 		setProcessorFlags(status);
-		int highByte = pop();
 		int lowByte = pop();
+		int highByte = pop();
 		programCounter = highByte * ENDIAN_MULT + lowByte;
 	}
 
@@ -722,7 +726,7 @@ public class Processor implements Runnable {
 			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
-		if (mem >> 6 == 1) {
+		if ((mem & 0b01000000) > 0) {
 			overflowFlag = true;
 		} else {
 			overflowFlag = false;
@@ -1416,11 +1420,13 @@ public class Processor implements Runnable {
 
 	private int indirect(int operand0, int operand1) {
 		if (operand0 != 0xFF) {
-			return memory.getByte(convertOperandsToAddress(operand0, operand1))
-					+ memory.getByte(convertOperandsToAddress(operand0, operand1, 1)) * ENDIAN_MULT;
+			int lowByte = memory.getByte(convertOperandsToAddress(operand0, operand1));
+			int highByte = memory.getByte(convertOperandsToAddress(operand0, operand1, 1)) * ENDIAN_MULT;
+			return lowByte + highByte;
 		} else {
-			return memory.getByte(convertOperandsToAddress(operand0, operand1))
-					+ memory.getByte(convertOperandsToAddress(0x00, operand1) * ENDIAN_MULT);
+			int lowByte = memory.getByte(convertOperandsToAddress(operand0, operand1));
+			int highByte = memory.getByte(convertOperandsToAddress(0x00, operand1)) * ENDIAN_MULT;
+			return lowByte + highByte;
 		}
 	}
 
@@ -1429,7 +1435,7 @@ public class Processor implements Runnable {
 	}
 
 	private int convertOperandsToAddress(int operand0, int operand1, int offset) {
-		return operand0 + operand1 * ENDIAN_MULT + offset;
+		return (operand0 + operand1 * ENDIAN_MULT + offset) & 0xFFFF;
 	}
 
 	private int zeroPageWithOffset(int operand0, int offset) {
@@ -1441,7 +1447,8 @@ public class Processor implements Runnable {
 	}
 
 	private int indirectY(int operand0) {
-		return memory.getByte(operand0) + memory.getByte(operand0 + 1) * ENDIAN_MULT + yIndex;
+		int address = memory.getByte(operand0) + memory.getByte(operand0 + 1) * ENDIAN_MULT + yIndex;
+		return address & 0xFFFF;
 	}
 
 	private int addWithCarry(int operand0, int operand1) {
@@ -1456,12 +1463,23 @@ public class Processor implements Runnable {
 	private boolean isPageBoundaryCrossed(int address, int offset) {
 		return address % 0x100 > (address + offset) % 0x100;
 	}
+	
+	private void NMI() {
+		push(programCounter >> 8);
+		push(programCounter & 0xFF);
+		push(getStatus());
+		programCounter = memory.getByte(0xFFFA) + memory.getByte(0xFFFB) * ENDIAN_MULT;
+		currentCycles = 7;
+		interruptFlag = true;
+		nmi = false;
+	}
 
-	@Override
-	public void run() {
+	public void start() {
 		while (memory.getByte(programCounter) != 0x00) {
 			try {
-				if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
+				if (nmi) {
+					NMI();
+				} else if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					cacheOperation(opcode);
 					runInstruction(opcode, 0, 0);
@@ -1508,7 +1526,10 @@ public class Processor implements Runnable {
 				log.error("Most recent operations: {}", operationCache);
 				throw new RuntimeException();
 			}
-			clock.registerCycles(currentCycles);
+			for (int i = 0; i < currentCycles; i++) {
+				ppu.draw();
+			}
+			outputState();
 		}
 	}
 }

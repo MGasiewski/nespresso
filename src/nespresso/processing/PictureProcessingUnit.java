@@ -6,11 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import nespresso.memory.Memory;
 
 @Slf4j
-public class PictureProcessingUnit implements Runnable {
+public class PictureProcessingUnit {
 
 	@Getter
 	@Setter
-	private Clock clock;
+	private Processor processor;
 	@Getter
 	@Setter
 	private Memory memory;
@@ -21,6 +21,14 @@ public class PictureProcessingUnit implements Runnable {
 	private int tileShiftRegisterTwo;
 	private int paletteShiftRegisterOne;
 	private int paletteShiftRegisterTwo;
+	private int currPixel = 0;
+	private int currLine = -1;
+	private boolean busHighByteLoaded = false;
+	private boolean writeMode = false;
+	private int busLowByte = 0x0;
+	private int busHighByte = 0x0;
+	private int busData = 0x0;
+	private int writeAddress = 0x0;
 	private boolean evenFrame = true;
 
 	// Render scanlines -1 through 240
@@ -33,71 +41,94 @@ public class PictureProcessingUnit implements Runnable {
 		 */
 	}
 
-	@Override
-	public void run() {
-		while (true) {
-			drawScreen();
-			log.info("Screen Drawn {}", System.currentTimeMillis());
-			evenFrame = !evenFrame;
-		}
-	}
-
-	public void drawScreen() {
-		for (int i = -1; i < 261; i++) {
-			drawLine(i);
-		}
-	}
-
-	public void drawLine(int lineNum) {
-		if (lineNum == -1) {
+	public void draw() {
+		loadCPUData();
+		if (currLine == -1) {
 			drawPrerenderLine();
-		} else if (lineNum >= 0 && lineNum < 240) {
-			drawVisibleLine(lineNum);
+		} else if (currLine >= 0 && currLine < 240 && renderingIsOn()) {
+			drawVisibleLine();
 		} else {
-			drawPostrenderLine(lineNum);
+			drawPostrenderLine();
 		}
+		currPixel += 1;
+		if (currPixel == 341) {
+			currPixel = 0;
+			currLine += 1;
+			if (currLine == 261) {
+				currLine = -1;
+			}
+		}
+
 	}
 
 	private void drawPrerenderLine() {
-		for (int i = 0; i <= 340; i++) {
-			clock.getPpuCycle();
-			if (i == 1) {
-				clearVblank();
-			}
+		if (currPixel == 1) {
+			clearVblank();
 		}
 	}
 
-	private void drawVisibleLine(int lineNum) {
-		for (int i = 0; i <= 340; i++) {
-			clock.getPpuCycle();
-			// TODO
+	private void drawVisibleLine() {
+		// TODO
+	}
+
+	public void drawPostrenderLine() {
+		if (currLine == 241 && currPixel == 1) {
+			setVblank();
+		}
+
+	}
+
+	private void loadCPUData() {
+		if (memory.isPpuAddrSet()) {
+			if (!busHighByteLoaded) {
+				busHighByte = getPpuAddr();
+				busHighByteLoaded = true;
+				memory.setPpuAddrSet(false);
+			} else {
+				busLowByte = getPpuAddr();
+				busHighByteLoaded = false;
+				memory.setPpuAddrSet(false);
+			}
+		} else if (memory.isPpuDataSet()) {
+			busData = getPpuData();
+			memory.setPpuDataSet(false);
+			writeToVram();
 		}
 	}
 
-	public void drawPostrenderLine(int lineNum) {
-		for (int i = 0; i <= 340; i++) {
-			clock.getPpuCycle();
-			if (lineNum == 241 && i == 1) {
-				setVblank();
-			}
-			loadCPUData();
-			if(getPpuData() > 0) {
-				log.info("PPUDATA greater than 0: {}", getPpuData());
-			}
+	private void writeToVram() {
+		if (!writeMode) {
+			writeAddress = busHighByte << 8;
+			writeAddress += busLowByte;
+			writeMode = true;
+		}
+		internalMemory[writeAddress] = busData;
+		if ((getPpuCtrl() & 0b00000100) == 0) {
+			writeAddress += 1;
+		} else {
+			writeAddress += 32;
 		}
 	}
-	
-	public void loadCPUData() {
-	}
 
-	public void setVblank() {
+	private void setVblank() {
 		int newVal = getPpuStatus() | 0b10000000;
 		setPpuStatus(newVal);
+		setPpuCtrl(getPpuCtrl() | 0b10000000);
+		processor.setNmi(true);
 	}
 
-	public void clearVblank() {
+	private void clearVblank() {
 		int newVal = getPpuStatus() & 0b01111111;
 		setPpuStatus(newVal);
+		setPpuCtrl(getPpuCtrl() & 0b01111111);
+	}
+
+	private boolean renderingIsOn() {
+		return (getPpuMask() & 0x18) == 0x18;
+	}
+
+	private boolean inVblank() {
+		return (getPpuStatus() >> 7) == 1;
 	}
 
 	public void setByte(int location, int value) {
