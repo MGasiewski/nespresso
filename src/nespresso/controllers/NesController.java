@@ -18,7 +18,7 @@ public class NesController {
 	private String nesTest = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\nestest.nes";
 	
 	public void initializeNes() {
-		ppu = new PictureProcessingUnit();
+		ppu = PictureProcessingUnit.getInstance();
 		try {
 			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
 		} catch (FileNotFoundException e) {
@@ -29,7 +29,7 @@ public class NesController {
 		processor.setPpu(ppu);
 		ppu.setProcessor(processor);
 		ppu.setMemory(memory);
-	}
+	}	
 	
 	public static void main(String[] args) {
 		NesController controller = new NesController();

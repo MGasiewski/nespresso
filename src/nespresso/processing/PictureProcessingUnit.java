@@ -8,6 +8,7 @@ import nespresso.memory.Memory;
 @Slf4j
 public class PictureProcessingUnit {
 
+	private static PictureProcessingUnit ppu;
 	@Getter
 	@Setter
 	private Processor processor;
@@ -16,15 +17,38 @@ public class PictureProcessingUnit {
 	private Memory memory;
 	@Getter
 	@Setter
-	int[] internalMemory = new int[0x3FFF];
+	int[] internalMemory = new int[0x4000];
 	private int tileShiftRegisterOne;
 	private int tileShiftRegisterTwo;
 	private int paletteShiftRegisterOne;
 	private int paletteShiftRegisterTwo;
+	@Getter
+	@Setter
+	private int ctrl = 0;
+	@Getter
+	@Setter
+	private int mask = 0;
+	@Getter
+	@Setter
+	private int status = 0;
+	@Getter
+	@Setter
+	private int oamdata = 0;
+	@Getter
+	@Setter
+	private int oamaddr = 0;
+	@Getter
+	@Setter
+	private int scroll = 0;
+	@Getter
+	@Setter
+	private int addr = 0;
+	@Getter
+	@Setter
+	private int data = 0;
 	private int currPixel = 0;
 	private int currLine = -1;
-	private boolean busHighByteLoaded = false;
-	private boolean writeMode = false;
+	private boolean lowByte = false;
 	private int busLowByte = 0x0;
 	private int busHighByte = 0x0;
 	private int busData = 0x0;
@@ -35,14 +59,17 @@ public class PictureProcessingUnit {
 	// each scanline, render pixel 0 through 255
 	// each pixel do ...
 
-	public PictureProcessingUnit() {
-		/*
-		 * setPpuCtrl(0x0); setPpuMask(0x0); setPpuScroll(0x0); setPpuData(0x0);
-		 */
+	public static synchronized PictureProcessingUnit getInstance() {
+		if (ppu == null) {
+			ppu = new PictureProcessingUnit();
+		}
+		return ppu;
+	}
+
+	private PictureProcessingUnit() {
 	}
 
 	public void draw() {
-		loadCPUData();
 		if (currLine == -1) {
 			drawPrerenderLine();
 		} else if (currLine >= 0 && currLine < 240 && renderingIsOn()) {
@@ -55,6 +82,8 @@ public class PictureProcessingUnit {
 			currPixel = 0;
 			currLine += 1;
 			if (currLine == 261) {
+				log.info("Palette values: {} {} {} {}", internalMemory[0x3F00], internalMemory[0x3F01], internalMemory[0x3F02], internalMemory[0x3F03]);
+				log.info("Nametable bytes: {} {} {} {}", internalMemory[0x2000], internalMemory[0x2001], internalMemory[0x2002], internalMemory[0x2003]);
 				currLine = -1;
 			}
 		}
@@ -78,129 +107,51 @@ public class PictureProcessingUnit {
 
 	}
 
-	private void loadCPUData() {
-		if (memory.isPpuAddrSet()) {
-			if (!busHighByteLoaded) {
-				busHighByte = getPpuAddr();
-				busHighByteLoaded = true;
-				memory.setPpuAddrSet(false);
-			} else {
-				busLowByte = getPpuAddr();
-				busHighByteLoaded = false;
-				memory.setPpuAddrSet(false);
-			}
-		} else if (memory.isPpuDataSet()) {
-			busData = getPpuData();
-			memory.setPpuDataSet(false);
-			writeToVram();
-		}
-	}
-
-	private void writeToVram() {
-		if (!writeMode) {
-			writeAddress = busHighByte << 8;
-			writeAddress += busLowByte;
-			writeMode = true;
-		}
-		internalMemory[writeAddress] = busData;
-		if ((getPpuCtrl() & 0b00000100) == 0) {
+	public void writeToVram(int data) {
+		internalMemory[writeAddress] = data;
+		if ((getCtrl() & 0b00000100) == 0) {
 			writeAddress += 1;
 		} else {
 			writeAddress += 32;
 		}
+		writeAddress &= 0x3FFF;
 	}
 
+	public void writeAddress(int addressByte) {
+		if(lowByte) {
+			busLowByte = addressByte;
+			writeAddress = busHighByte << 8;
+			writeAddress += busLowByte;
+			writeAddress &= 0x3FFF;
+			lowByte = false;
+		}else {
+			busHighByte = addressByte;		
+			lowByte = true;
+		}
+	}
+	
 	private void setVblank() {
-		int newVal = getPpuStatus() | 0b10000000;
-		setPpuStatus(newVal);
-		setPpuCtrl(getPpuCtrl() | 0b10000000);
+		int newVal = getStatus() | 0b10000000;
+		setStatus(newVal);
+		setCtrl(getCtrl() | 0b10000000);
 		processor.setNmi(true);
 	}
 
 	private void clearVblank() {
-		int newVal = getPpuStatus() & 0b01111111;
-		setPpuStatus(newVal);
-		setPpuCtrl(getPpuCtrl() & 0b01111111);
+		int newVal = getStatus() & 0b01111111;
+		setStatus(newVal);
+		setCtrl(getCtrl() & 0b01111111);
 	}
 
 	private boolean renderingIsOn() {
-		return (getPpuMask() & 0x18) == 0x18;
+		return (getMask() & 0x18) == 0x18;
 	}
 
 	private boolean inVblank() {
-		return (getPpuStatus() >> 7) == 1;
+		return (getStatus() >> 7) == 1;
 	}
 
 	public void setByte(int location, int value) {
 		internalMemory[location] = value;
 	}
-
-	public void setPpuCtrl(int value) {
-		memory.setByte(0x2000, value);
-	}
-
-	public int getPpuCtrl() {
-		return memory.getByte(0x2000);
-	}
-
-	public void setPpuMask(int value) {
-		memory.setByte(0x2001, value);
-	}
-
-	public int getPpuMask() {
-		return memory.getByte(0x2001);
-	}
-
-	public void setPpuStatus(int value) {
-		memory.setByte(0x2002, value);
-	}
-
-	public int getPpuStatus() {
-		return memory.getByte(0x2002);
-	}
-
-	public void setOamAddr(int value) {
-		memory.setByte(0x2003, value);
-	}
-
-	public int getOamAddr() {
-		return memory.getByte(0x2003);
-	}
-
-	public void setOamData(int value) {
-		memory.setByte(0x2004, value);
-	}
-
-	public int getOamData() {
-		return memory.getByte(0x2004);
-	}
-
-	public void setPpuScroll(int value) {
-		memory.setByte(0x2005, value);
-	}
-
-	public int getPpuScroll() {
-		return memory.getByte(0x2005);
-	}
-
-	public void setPpuAddr(int value) {
-		memory.setByte(0x2006, value);
-	}
-
-	public int getPpuAddr() {
-		return memory.getByte(0x2006);
-	}
-
-	public void setPpuData(int value) {
-		memory.setByte(0x2007, value);
-	}
-
-	public int getPpuData() {
-		return memory.getByte(0x2007);
-	}
-
-	public int getOamDma() {
-		return memory.getByte(0x4014);
-	}
-
 }

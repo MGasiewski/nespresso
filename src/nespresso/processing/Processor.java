@@ -1529,7 +1529,7 @@ public class Processor {
 			for (int i = 0; i < currentCycles; i++) {
 				ppu.draw();
 			}
-			outputState();
 		}
+		log.info("must have reached 0x00");
 	}
 }
