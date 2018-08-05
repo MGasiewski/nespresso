@@ -2,13 +2,11 @@ package nespresso.processing;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.management.RuntimeErrorException;
+import static java.lang.Integer.toHexString;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import nespresso.controllers.NesController;
 import nespresso.exceptions.IncorrectOpcodeException;
 import nespresso.exceptions.UnknownOpcodeException;
 import nespresso.memory.Memory;
@@ -35,7 +33,7 @@ public class Processor {
 	@Getter
 	private boolean interruptFlag = false;
 	@Getter
-	private boolean decimalModeFlag = false;
+	private boolean decimalModeFlag = true;
 	@Getter
 	private boolean softwareInterruptFlag = true;
 	@Getter
@@ -74,16 +72,13 @@ public class Processor {
 		xIndex = 0;
 		yIndex = 0;
 		stackPointer = 0xFD;
-		programCounter = indirect(0xFC, 0xFF);
-		// programCounter = 0xC000;
+		//programCounter = indirect(0xFC, 0xFF);
+		programCounter = 0xC000;
 
 	}
 
 	public void outputState() {
-		log.info("A: " + Integer.toHexString(accumulator) + " X: " + Integer.toHexString(xIndex) + " Y: "
-				+ Integer.toHexString(yIndex));
-		log.info("PC: " + Integer.toHexString(programCounter) + " SP: " + Integer.toHexString(stackPointer));
-		log.info("Status: " + Integer.toBinaryString(getStatus()));
+		System.out.println("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase() + " Y:" + toHexString(yIndex).toUpperCase() + " P:" + toHexString(getStatus()).toUpperCase() + " SP:" + toHexString(stackPointer).toUpperCase());
 	}
 
 	public void outputCache() {
@@ -94,14 +89,14 @@ public class Processor {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
 		}
-		operationCache.add(Integer.toHexString(opcode));
+		operationCache.add(Integer.toHexString(opcode) + " PC: " + Integer.toHexString(programCounter));
 	}
 
 	public void cacheOperation(int opcode, int operand) {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
 		}
-		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand));
+		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand) + " PC: " + Integer.toHexString(programCounter));
 	}
 
 	public void cacheOperation(int opcode, int operand0, int operand1) {
@@ -109,7 +104,7 @@ public class Processor {
 			operationCache.remove(0);
 		}
 		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand0) + " "
-				+ Integer.toHexString(operand1));
+				+ Integer.toHexString(operand1) + " PC: " + Integer.toHexString(programCounter));
 	}
 
 	public void runInstruction(int opcode, int operand0, int operand1)
@@ -463,6 +458,8 @@ public class Processor {
 		// PLA - Pull Accumulator
 		case 0x68:
 			accumulator = pop();
+			zeroFlag = accumulator == 0;
+			signFlag = accumulator >> 7 == 1;
 			currentCycles = 4;
 			break;
 		// PLP - Pull Processor Status
@@ -826,10 +823,14 @@ public class Processor {
 		default:
 			break;
 		}
+		if(accumulator < 0) {
+			accumulator = 0xFF + accumulator + 1;
+		}
 		carryFlag = minuend >= subtrahend;
 		signFlag = accumulator >> 7 == 1;
 		zeroFlag = accumulator == 0;
-		overflowFlag = false; // TODO figure out and implementation for this
+		overflowFlag = evaluateOverflowSbc(minuend, subtrahend, accumulator);
+		accumulator &= 0xFF;
 	}
 
 	private void logicalShiftRight(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
@@ -916,6 +917,8 @@ public class Processor {
 		default:
 			throw new IncorrectOpcodeException();
 		}
+		zeroFlag = accumulator == 0;
+		signFlag = accumulator >> 7 == 1;
 	}
 
 	private void decrementMemory(int opcode, int operand0, int operand1) throws IncorrectOpcodeException {
@@ -1334,46 +1337,53 @@ public class Processor {
 	}
 
 	private void addWithCarry(int opcode, int operand0, int operand1) {
-		int initialValue = accumulator;
+		int addend1 = accumulator;
+		int addend2 = 0;
 		switch (opcode) {
 		case 0x69:
-			accumulator = addWithCarry(operand0, accumulator);
+			addend2 = operand0;
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 2;
 			break;
 		case 0x65:
-			accumulator = addWithCarry(memory.getByte(operand0), accumulator);
+			addend2 = memory.getByte(operand0);
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 3;
 			break;
 		case 0x75:
-			accumulator = addWithCarry(memory.getByte(zeroPageWithOffset(operand0, xIndex)), accumulator);
+			addend2 = memory.getByte(zeroPageWithOffset(operand0, xIndex));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 4;
 			break;
 		case 0x6D:
-			accumulator = addWithCarry(memory.getByte(convertOperandsToAddress(operand0, operand1)), accumulator);
+			addend2 = memory.getByte(convertOperandsToAddress(operand0, operand1));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 4;
 			break;
 		case 0x7D:
-			accumulator = addWithCarry(memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)),
-					accumulator);
+			addend2 = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 4;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
 				currentCycles += 1;
 			}
 			break;
 		case 0x79:
-			accumulator = addWithCarry(memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex)),
-					accumulator);
+			addend2 = memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 4;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex)) {
 				currentCycles += 1;
 			}
 			break;
 		case 0x61:
-			accumulator = addWithCarry(memory.getByte(indirectX(operand0)), accumulator);
+			addend2 = memory.getByte(indirectX(operand0));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 6;
 			break;
 		case 0x71:
-			accumulator = addWithCarry(memory.getByte(indirectY(operand0)), accumulator);
+			addend2 = memory.getByte(indirectY(operand0));
+			accumulator = addWithCarry(addend1, addend2);
 			currentCycles = 5;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(0x00, memory.getByte(operand0)), yIndex)) {
 				currentCycles += 1;
@@ -1382,6 +1392,7 @@ public class Processor {
 		}
 		zeroFlag = accumulator == 0;
 		signFlag = accumulator >> 7 == 1;
+		overflowFlag = evaluateOverflowAdc(addend1, addend2, accumulator);
 	}
 
 	private void storeX(int opcode, int operand0, int operand1) {
@@ -1443,7 +1454,9 @@ public class Processor {
 	}
 
 	private int indirectX(int operand0) {
-		return memory.getByte(operand0 + xIndex) + memory.getByte(operand0 + xIndex + 1) * ENDIAN_MULT;
+		int addressLowByte = (operand0 + xIndex) & 0xFF;
+		int addressHighByte = (operand0 + xIndex + 1) & 0xFF;
+		return memory.getByte(addressLowByte) + memory.getByte(addressHighByte) * ENDIAN_MULT;
 	}
 
 	private int indirectY(int operand0) {
@@ -1456,6 +1469,8 @@ public class Processor {
 		result += carryFlag ? 1 : 0;
 		if (result > 0xFF) {
 			carryFlag = true;
+		}else {
+			carryFlag = false;
 		}
 		return result % 0x100;
 	}
@@ -1474,26 +1489,41 @@ public class Processor {
 		nmi = false;
 	}
 
+	public boolean evaluateOverflowAdc(int addend1, int addend2, int result) {
+		return (!(((addend1 ^ addend2) & 0x80) == 0x80)) && ((addend1 ^ result) & 0x80) == 0x80;
+	}
+	
+	public boolean evaluateOverflowSbc(int addend1, int addend2, int result) {
+		return ((((addend1 ^ addend2) & 0x80) == 0x80)) && ((addend1 ^ result) & 0x80) == 0x80;
+	}
+	
 	public void start() {
-		while (memory.getByte(programCounter) != 0x00) {
+		while (true) {
+			System.out.print(toHexString(programCounter).toUpperCase() + "\t"); //TODO delete later
 			try {
 				if (nmi) {
 					NMI();
 				} else if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
-					cacheOperation(opcode);
+					System.out.print(toHexString(opcode).toUpperCase() + "\t"); //TODO delete later
+					outputState(); //TODO delete later
 					runInstruction(opcode, 0, 0);
+					cacheOperation(opcode);
 				} else if (OpcodeLookup.twoByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand = memory.getByte(programCounter++);
-					cacheOperation(opcode, operand);
+					System.out.print(toHexString(opcode).toUpperCase() + " " + toHexString(operand).toUpperCase() + "\t"); //TODO delete later
+					outputState(); //TODO delete later
 					runInstruction(opcode, operand, 0);
+					cacheOperation(opcode, operand);
 				} else if (OpcodeLookup.threeByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand0 = memory.getByte(programCounter++);
 					int operand1 = memory.getByte(programCounter++);
-					cacheOperation(opcode, operand0, operand1);
+					System.out.print(toHexString(opcode).toUpperCase() + " " + toHexString(operand0).toUpperCase() + " " + toHexString(operand1).toUpperCase() + "\t"); //TODO delete later
+					outputState(); //TODO delete later
 					runInstruction(opcode, operand0, operand1);
+					cacheOperation(opcode, operand0, operand1);
 				} else {
 					throw new UnknownOpcodeException();
 				}
@@ -1522,7 +1552,7 @@ public class Processor {
 				throw new RuntimeException();
 			} else if (programCounter > 0xFFFF) {
 				log.error("Critical error, program counter has an incorrect value: {}",
-						Integer.toHexString(programCounter));
+						toHexString(programCounter));
 				log.error("Most recent operations: {}", operationCache);
 				throw new RuntimeException();
 			}
@@ -1530,6 +1560,5 @@ public class Processor {
 				ppu.draw();
 			}
 		}
-		log.info("must have reached 0x00");
 	}
 }

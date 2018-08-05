@@ -18,10 +18,6 @@ public class PictureProcessingUnit {
 	@Getter
 	@Setter
 	int[] internalMemory = new int[0x4000];
-	private int tileShiftRegisterOne;
-	private int tileShiftRegisterTwo;
-	private int paletteShiftRegisterOne;
-	private int paletteShiftRegisterTwo;
 	@Getter
 	@Setter
 	private int ctrl = 0;
@@ -51,7 +47,6 @@ public class PictureProcessingUnit {
 	private boolean lowByte = false;
 	private int busLowByte = 0x0;
 	private int busHighByte = 0x0;
-	private int busData = 0x0;
 	private int writeAddress = 0x0;
 	private boolean evenFrame = true;
 
@@ -82,8 +77,6 @@ public class PictureProcessingUnit {
 			currPixel = 0;
 			currLine += 1;
 			if (currLine == 261) {
-				log.info("Palette values: {} {} {} {}", internalMemory[0x3F00], internalMemory[0x3F01], internalMemory[0x3F02], internalMemory[0x3F03]);
-				log.info("Nametable bytes: {} {} {} {}", internalMemory[0x2000], internalMemory[0x2001], internalMemory[0x2002], internalMemory[0x2003]);
 				currLine = -1;
 			}
 		}
@@ -153,5 +146,9 @@ public class PictureProcessingUnit {
 
 	public void setByte(int location, int value) {
 		internalMemory[location] = value;
+	}
+	
+	public void resetAddressLatch() {
+		writeAddress = 0x00;
 	}
 }

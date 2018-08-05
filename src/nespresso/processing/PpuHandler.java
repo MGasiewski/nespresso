@@ -9,6 +9,7 @@ public class PpuHandler {
 		int num = address & 0xF;
 		switch (num) {
 		case 2:
+			PictureProcessingUnit.getInstance().resetAddressLatch();
 			return PictureProcessingUnit.getInstance().getStatus();
 		case 4:
 			return PictureProcessingUnit.getInstance().getOamdata();
