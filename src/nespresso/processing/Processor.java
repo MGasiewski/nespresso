@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import static java.lang.Integer.toHexString;
 
+import java.io.File;
+import java.io.PrintStream;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -72,13 +75,28 @@ public class Processor {
 		xIndex = 0;
 		yIndex = 0;
 		stackPointer = 0xFD;
-		//programCounter = indirect(0xFC, 0xFF);
-		programCounter = 0xC000;
+		programCounter = indirect(0xFC, 0xFF);
+		// programCounter = 0xC000;
 
 	}
 
 	public void outputState() {
-		System.out.println("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase() + " Y:" + toHexString(yIndex).toUpperCase() + " P:" + toHexString(getStatus()).toUpperCase() + " SP:" + toHexString(stackPointer).toUpperCase());
+		System.out.print("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase()
+				+ " Y:" + toHexString(yIndex).toUpperCase() + " S:" + toHexString(stackPointer).toUpperCase() + " P:"
+				+ getAlphaStatus() + " ");
+	}
+
+	private String getAlphaStatus() {
+		StringBuilder status = new StringBuilder(10);
+		status.append(signFlag ? "N" : "n");
+		status.append(overflowFlag ? "V" : "v");
+		status.append("U");
+		status.append(softwareInterruptFlag ? "B" : "b");
+		status.append(decimalModeFlag ? "D" : "d");
+		status.append(interruptFlag ? "I" : "i");
+		status.append(zeroFlag ? "Z" : "z");
+		status.append(carryFlag ? "C" : "c");
+		return status.toString();
 	}
 
 	public void outputCache() {
@@ -96,7 +114,8 @@ public class Processor {
 		if (operationCache.size() > 10) {
 			operationCache.remove(0);
 		}
-		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand) + " PC: " + Integer.toHexString(programCounter));
+		operationCache.add(Integer.toHexString(opcode) + " " + Integer.toHexString(operand) + " PC: "
+				+ Integer.toHexString(programCounter));
 	}
 
 	public void cacheOperation(int opcode, int operand0, int operand1) {
@@ -715,7 +734,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0x2C:
-			mem = convertOperandsToAddress(operand0, operand1);
+			mem = memory.getByte(convertOperandsToAddress(operand0, operand1));
 			result = accumulator & mem;
 			currentCycles = 4;
 			break;
@@ -723,11 +742,7 @@ public class Processor {
 			throw new IncorrectOpcodeException();
 		}
 		zeroFlag = result == 0;
-		if ((mem & 0b01000000) > 0) {
-			overflowFlag = true;
-		} else {
-			overflowFlag = false;
-		}
+		overflowFlag = (mem & 0x40) == 0x40;
 		signFlag = mem >> 7 == 1;
 	}
 
@@ -823,7 +838,7 @@ public class Processor {
 		default:
 			break;
 		}
-		if(accumulator < 0) {
+		if (accumulator < 0) {
 			accumulator = 0xFF + accumulator + 1;
 		}
 		carryFlag = minuend >= subtrahend;
@@ -1469,7 +1484,7 @@ public class Processor {
 		result += carryFlag ? 1 : 0;
 		if (result > 0xFF) {
 			carryFlag = true;
-		}else {
+		} else {
 			carryFlag = false;
 		}
 		return result % 0x100;
@@ -1478,7 +1493,7 @@ public class Processor {
 	private boolean isPageBoundaryCrossed(int address, int offset) {
 		return address % 0x100 > (address + offset) % 0x100;
 	}
-	
+
 	private void NMI() {
 		push(programCounter >> 8);
 		push(programCounter & 0xFF);
@@ -1492,36 +1507,37 @@ public class Processor {
 	public boolean evaluateOverflowAdc(int addend1, int addend2, int result) {
 		return (!(((addend1 ^ addend2) & 0x80) == 0x80)) && ((addend1 ^ result) & 0x80) == 0x80;
 	}
-	
+
 	public boolean evaluateOverflowSbc(int addend1, int addend2, int result) {
 		return ((((addend1 ^ addend2) & 0x80) == 0x80)) && ((addend1 ^ result) & 0x80) == 0x80;
 	}
-	
+
+	private void turnOnFileOutput() {
+		try {
+			System.setOut(new PrintStream(new File("logfile.txt")));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	public void start() {
 		while (true) {
-			System.out.print(toHexString(programCounter).toUpperCase() + "\t"); //TODO delete later
 			try {
 				if (nmi) {
 					NMI();
 				} else if (OpcodeLookup.oneByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
-					System.out.print(toHexString(opcode).toUpperCase() + "\t"); //TODO delete later
-					outputState(); //TODO delete later
 					runInstruction(opcode, 0, 0);
 					cacheOperation(opcode);
 				} else if (OpcodeLookup.twoByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand = memory.getByte(programCounter++);
-					System.out.print(toHexString(opcode).toUpperCase() + " " + toHexString(operand).toUpperCase() + "\t"); //TODO delete later
-					outputState(); //TODO delete later
 					runInstruction(opcode, operand, 0);
 					cacheOperation(opcode, operand);
 				} else if (OpcodeLookup.threeByteOpcodes.contains(memory.getByte(programCounter))) {
 					int opcode = memory.getByte(programCounter++);
 					int operand0 = memory.getByte(programCounter++);
 					int operand1 = memory.getByte(programCounter++);
-					System.out.print(toHexString(opcode).toUpperCase() + " " + toHexString(operand0).toUpperCase() + " " + toHexString(operand1).toUpperCase() + "\t"); //TODO delete later
-					outputState(); //TODO delete later
 					runInstruction(opcode, operand0, operand1);
 					cacheOperation(opcode, operand0, operand1);
 				} else {
@@ -1551,12 +1567,11 @@ public class Processor {
 				log.error("Most recent operations: {}", operationCache);
 				throw new RuntimeException();
 			} else if (programCounter > 0xFFFF) {
-				log.error("Critical error, program counter has an incorrect value: {}",
-						toHexString(programCounter));
+				log.error("Critical error, program counter has an incorrect value: {}", toHexString(programCounter));
 				log.error("Most recent operations: {}", operationCache);
 				throw new RuntimeException();
 			}
-			for (int i = 0; i < currentCycles; i++) {
+			for (int i = 0; i < currentCycles * 3; i++) {
 				ppu.draw();
 			}
 		}

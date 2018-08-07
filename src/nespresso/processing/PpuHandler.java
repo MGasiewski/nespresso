@@ -1,8 +1,5 @@
 package nespresso.processing;
 
-import lombok.Getter;
-import lombok.Setter;
-
 public class PpuHandler {
 
 	public int read(int address) {
@@ -21,34 +18,39 @@ public class PpuHandler {
 	}
 
 	public void write(int address, int data) {
-		int num = address & 0xF;
+		int num = address & 0xFF;
 		switch (num) {
 		case 0:
 			PictureProcessingUnit.getInstance().setCtrl(data);
 			//TODO
 			break;
-		case 1:
+		case 0x1:
 			PictureProcessingUnit.getInstance().setMask(data);
 			//TODO
 			break;
-		case 3:
+		case 0x3:
 			PictureProcessingUnit.getInstance().setOamaddr(data);
 			//TODO correct implementation
 			break;
-		case 4:
+		case 0x4:
 			PictureProcessingUnit.getInstance().setOamdata(data);
 			//TODO
 			break;
-		case 5:
+		case 0x5:
 			PictureProcessingUnit.getInstance().setScroll(data);
 			//TODO
 			break;
-		case 6:
+		case 0x6:
 			PictureProcessingUnit.getInstance().writeAddress(data);
 			break;
-		case 7:
+		case 0x7:
 			PictureProcessingUnit.getInstance().writeToVram(data);
 			break;
+		case 0x14:
+			PictureProcessingUnit.getInstance().writeSprites(data);
+			//TODO this costs a high number of cycles, so implement that
+			break;
 		}
+		
 	}
 }

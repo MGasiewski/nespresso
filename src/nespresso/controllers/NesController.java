@@ -20,7 +20,7 @@ public class NesController {
 	public void initializeNes() {
 		ppu = PictureProcessingUnit.getInstance();
 		try {
-			memory = new NromMapper(new FileInputStream(nesTest), ppu);
+			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
 		} catch (FileNotFoundException e) {
 			log.error("Cannot find rom");
 			e.printStackTrace();

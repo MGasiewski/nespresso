@@ -1,5 +1,7 @@
 package nespresso.processing;
 
+import java.util.stream.IntStream;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ public class PictureProcessingUnit {
 	@Getter
 	@Setter
 	int[] internalMemory = new int[0x4000];
+	int[] oamMemory = new int[0x100];
 	@Getter
 	@Setter
 	private int ctrl = 0;
@@ -49,7 +52,7 @@ public class PictureProcessingUnit {
 	private int busHighByte = 0x0;
 	private int writeAddress = 0x0;
 	private boolean evenFrame = true;
-
+	
 	// Render scanlines -1 through 240
 	// each scanline, render pixel 0 through 255
 	// each pixel do ...
@@ -84,7 +87,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void drawPrerenderLine() {
-		if (currPixel == 1) {
+		if (currPixel == 1) {	
 			clearVblank();
 		}
 	}
@@ -97,7 +100,6 @@ public class PictureProcessingUnit {
 		if (currLine == 241 && currPixel == 1) {
 			setVblank();
 		}
-
 	}
 
 	public void writeToVram(int data) {
@@ -123,17 +125,26 @@ public class PictureProcessingUnit {
 		}
 	}
 	
+	private boolean nmiOccurred() {
+		return (getStatus() & 0x80) == 0x80;
+	}
+	
+	private boolean nmiOutput() {
+		return (getCtrl() & 0x80) == 0x80;
+	}
+	
 	private void setVblank() {
 		int newVal = getStatus() | 0b10000000;
 		setStatus(newVal);
 		setCtrl(getCtrl() | 0b10000000);
-		processor.setNmi(true);
 	}
 
 	private void clearVblank() {
+		if(nmiOutput()) {
+			processor.setNmi(true);
+		}
 		int newVal = getStatus() & 0b01111111;
 		setStatus(newVal);
-		setCtrl(getCtrl() & 0b01111111);
 	}
 
 	private boolean renderingIsOn() {
@@ -150,5 +161,9 @@ public class PictureProcessingUnit {
 	
 	public void resetAddressLatch() {
 		writeAddress = 0x00;
+	}
+
+	public void writeSprites(int data) {
+		IntStream.rangeClosed(0, 0xFF).forEach(i -> oamMemory[i] = memory.getByte((data << 8) + i));
 	}
 }
