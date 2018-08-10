@@ -56,5 +56,9 @@ public class NromMapper extends Memory {
 			e.printStackTrace();
 		}
 	}
+	
+	public boolean inRom(int num) {
+		return num < 16384 * sixteenKbPrgUnits;
+	}
 
 }

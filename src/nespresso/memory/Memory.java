@@ -41,4 +41,8 @@ public class Memory {
 			cpuMemory[address] = value;
 		}
 	}
+
+	public boolean inRom() {
+		return false;
+	}
 }
