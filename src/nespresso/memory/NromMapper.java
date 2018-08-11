@@ -57,8 +57,9 @@ public class NromMapper extends Memory {
 		}
 	}
 	
+	@Override
 	public boolean inRom(int num) {
-		return num < 16384 * sixteenKbPrgUnits;
+		return num < 8192 * eightKbChrUnits;
 	}
 
 }

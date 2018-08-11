@@ -42,7 +42,7 @@ public class Memory {
 		}
 	}
 
-	public boolean inRom() {
+	public boolean inRom(int num) {
 		return false;
 	}
 }

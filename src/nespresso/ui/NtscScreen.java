@@ -1,32 +1,26 @@
 package nespresso.ui;
 
-import javafx.application.Application;
-import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
-import javafx.stage.Stage;
+import java.awt.Canvas;
+import java.awt.Color;
+import java.awt.Graphics;
 
-public class NtscScreen extends Application implements Screen {
+public class NtscScreen extends Canvas  {
 
-	private Canvas canvas;
-	private Pane root;
-	private Scene scene;
+	private int x = 0;
+	private int y = 0;
+	private Color c;
+	
+	
+	public void drawPixel(int x, int y, Color c) {
+		this.x = x;
+		this.y = y;
+		this.c = c;
+	}
 	
 	@Override
-	public void drawPixel(int x, int y, Color c) {
-		canvas.getGraphicsContext2D().getPixelWriter().setColor(x, y, c);
+	public void paint(Graphics g) {
+		super.paint(g);
+		g.setColor(c);
+		g.drawLine(x, y, x, y);
 	}
-
-	@Override
-	public void start(Stage primaryStage) throws Exception {
-		root = new Pane();
-		canvas = new Canvas(256, 224);
-		root.getChildren().add(canvas);
-		scene = new Scene(root);
-		primaryStage.setScene(scene);
-		primaryStage.setTitle("Nespresso");
-		primaryStage.show();
-	}
-
 }

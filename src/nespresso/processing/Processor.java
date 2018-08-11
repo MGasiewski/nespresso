@@ -1521,6 +1521,7 @@ public class Processor {
 	}
 
 	public void start() {
+		turnOnFileOutput();
 		while (true) {
 			try {
 				if (nmi) {

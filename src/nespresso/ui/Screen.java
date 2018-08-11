@@ -1,7 +1,7 @@
 package nespresso.ui;
 
-import javafx.scene.paint.Color;
+import java.awt.Color;
 
-public interface Screen {
-	public void drawPixel(int x, int y, Color c);
+public interface Screen  {
+	public abstract void drawPixel(int x, int y, Color c);
 }

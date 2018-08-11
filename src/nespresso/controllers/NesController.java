@@ -3,11 +3,16 @@ package nespresso.controllers;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
+import javax.swing.JFrame;
+
+import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 import nespresso.memory.Memory;
 import nespresso.memory.NromMapper;
 import nespresso.processing.PictureProcessingUnit;
 import nespresso.processing.Processor;
+import nespresso.ui.NtscScreen;
+import nespresso.ui.Screen;
 
 @Slf4j
 public class NesController {
