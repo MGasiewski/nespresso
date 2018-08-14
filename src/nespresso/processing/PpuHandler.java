@@ -7,7 +7,9 @@ public class PpuHandler {
 		switch (num) {
 		case 2:
 			PictureProcessingUnit.getInstance().resetAddressLatch();
-			return PictureProcessingUnit.getInstance().getStatus();
+			int value = PictureProcessingUnit.getInstance().getStatus();
+			//TODO clear vblank?
+			return value;
 		case 4:
 			return PictureProcessingUnit.getInstance().getOamdata();
 		case 7:
@@ -22,7 +24,8 @@ public class PpuHandler {
 		switch (num) {
 		case 0:
 			PictureProcessingUnit.getInstance().setCtrl(data);
-			//TODO
+			PictureProcessingUnit.getInstance().updateTempOnCtrlWrite(data);
+			//TODO NMI
 			break;
 		case 0x1:
 			PictureProcessingUnit.getInstance().setMask(data);

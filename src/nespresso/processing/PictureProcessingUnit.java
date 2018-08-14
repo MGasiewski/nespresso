@@ -1,24 +1,25 @@
 package nespresso.processing;
 
+import java.awt.Canvas;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.util.stream.IntStream;
 
-import javafx.scene.paint.Color;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import nespresso.memory.Memory;
-import nespresso.ui.Screen;
 
 @Slf4j
 public class PictureProcessingUnit {
-	
+
 	private static PictureProcessingUnit ppu;
 	@Getter
 	@Setter
-	private Screen screen;
+	private Processor processor;
 	@Getter
 	@Setter
-	private Processor processor;
+	private Canvas canvas;
 	@Getter
 	@Setter
 	private Memory memory;
@@ -55,7 +56,8 @@ public class PictureProcessingUnit {
 	private boolean evenFrame = true;
 	private int vramAddr = 0, vramTempAddr = 0, atByte = 0, ntByte = 0, fineXScroll = 0, tileLatch0 = 0, tileLatch1 = 0,
 			tileShiftRegister0 = 0, tileShiftRegister1 = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
-	private boolean firstSecondToggle = false;
+	private boolean firstSecondToggle = false, nmiPrev = false;
+	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
 
 	public static synchronized PictureProcessingUnit getInstance() {
 		if (ppu == null) {
@@ -81,50 +83,76 @@ public class PictureProcessingUnit {
 			currLine += 1;
 			if (currLine == 261) {
 				currLine = -1;
+				canvas.getGraphics().drawImage(image, 0, 0, canvas);
 			}
 		}
+	}
+
+	public void updateTempOnCtrlWrite(int data) {
+		vramTempAddr = (vramTempAddr & 0xF3FF) | ((data & 0x03) << 10);
 	}
 
 	private void drawOnPrerenderLine() {
 		if (currPixel == 1) {
 			clearVblank();
-		} else if (currPixel >= 321 && currPixel <= 340) {
-			fetch();
+		} else if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
 			incrementX();
+		} else if (currPixel == 256) {
 			incrementY();
+		} else if (currPixel == 257) {
+			horiV();
+		} else if (currPixel > 279 && currPixel < 305) {
+			vertV();
+		}
+		if (currPixel >= 321 && currPixel <= 340) {
+			fetch();
 		}
 	}
 
 	private void drawOnVisibleLine() {
-		//TODO dummy reads, pixel limitations
-		fetch();
-		incrementX();
-		incrementY();
-		outputPixel();
+		if (currPixel < 257 || currPixel > 320) {
+			fetch();
+		}
+		if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
+			incrementX();
+		} else if (currPixel == 256) {
+			incrementY();
+		} else if (currPixel == 257) {
+			horiV();
+		}
+		if (currPixel < 257 && currPixel != 0) {
+			addPixelToBuffer();
+		}
 	}
 
-	private void outputPixel() {
+	private void addPixelToBuffer() {
 		int low = tileLatch0 & 0x1;
 		tileLatch0 >>= 1;
 		int high = tileLatch1 & 0x1;
 		tileLatch1 >>= 1;
-		int value = high + low;
-		if(value == 0) {
-			System.out.print(" ");
-		}else {
-			System.out.print(value);
+		int value = (high << 1) + low;
+		int color = 0;
+		switch (value) {
+		case 0:
+			color = Color.BLACK.getRGB();
+			break;
+		case 1:
+			color = Color.WHITE.getRGB();
+			break;
+		case 2:
+			color = Color.YELLOW.getRGB();
+			break;
+		case 3:
+			color = Color.RED.getRGB();
+			break;
 		}
-		if(currPixel == 256) {
-			System.out.println("\\");
-		}
-		if(currLine == 240) {
-			System.out.println("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
-		}
+		image.setRGB(currPixel - 1, currLine, color);
 	}
 
 	public void drawOnPostrenderLine() {
 		if (currLine == 241 && currPixel == 1) {
 			setVblank();
+			outputNametable();
 		}
 	}
 
@@ -141,16 +169,18 @@ public class PictureProcessingUnit {
 	}
 
 	private int getPatternTableHalf() {
-		return (getCtrl() & 0x20) << 8;
+		return (getCtrl() & 0x20) == 0x20 ? 0x1000 : 0x0;
 	}
 
 	private void fetchHighBgTileByte() {
-		int addr = getPatternTableHalf() + ntByte * 16;
+		int fineY = (vramAddr >> 12) & 0x7;
+		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch0 = internalMemory[addr];
 	}
 
 	private void fetchLowBgTileByte() {
-		int addr = getPatternTableHalf() + ntByte * 16;
+		int fineY = (vramAddr >> 12) & 0x7;
+		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch1 = internalMemory[addr + 8];
 	}
 
@@ -180,19 +210,28 @@ public class PictureProcessingUnit {
 
 	public void writeAddress(int addressByte) {
 		if (lowByte) {
-			busLowByte = addressByte;
-			vramAddr = busHighByte << 8;
-			vramAddr += busLowByte;
-			vramAddr &= 0x3FFF;
+			vramTempAddr &= 0xfff00;
+			vramTempAddr |= data;
+			vramAddr = vramTempAddr;
 			lowByte = false;
 		} else {
-			busHighByte = addressByte;
+			vramTempAddr &= 0xc0ff;
+			vramTempAddr |= ((addressByte & 0x3f) << 8);
+			vramTempAddr &= 0x3fff;
 			lowByte = true;
 		}
 	}
 
+	private void horiV() {
+		vramAddr = (vramAddr & 0xFBE0) | (vramTempAddr & 0x041F);
+	}
+
+	private void vertV() {
+		vramAddr = 0x2000; // TODO hack to get PPU going on donkey kong
+	}
+
 	private void incrementX() {
-		if ((vramAddr & 0x001F) == 31) {
+		if ((vramAddr & 0x1F) == 31) {
 			vramAddr &= 0xFFE0;
 			vramAddr ^= 0x0400;
 		} else {
@@ -201,9 +240,9 @@ public class PictureProcessingUnit {
 	}
 
 	private void incrementY() {
-		if ((vramAddr & 0x7000) != 0x7000)
+		if ((vramAddr & 0x7000) != 0x7000) {
 			vramAddr += 0x1000;
-		else {
+		} else {
 			vramAddr &= 0x8FFF;
 			int y = (vramAddr & 0x03E0) >> 5;
 			if (y == 29) {
@@ -218,11 +257,11 @@ public class PictureProcessingUnit {
 		}
 	}
 
-	private boolean nmiOccurred() {
+	protected boolean nmiOccurred() {
 		return (getStatus() & 0x80) == 0x80;
 	}
 
-	private boolean nmiOutput() {
+	protected boolean nmiOutput() {
 		return (getCtrl() & 0x80) == 0x80;
 	}
 
@@ -232,9 +271,14 @@ public class PictureProcessingUnit {
 		setCtrl(getCtrl() | 0x80);
 	}
 
-	private void clearVblank() {
+	public void clearVblank() {
 		if (nmiOutput()) {
-			processor.setNmi(true);
+			if (!nmiPrev) {
+				nmiPrev = true;
+			} else {
+				processor.setNmi(true);
+				nmiPrev = false;
+			}
 		}
 		int newVal = getStatus() & 0b01111111;
 		setStatus(newVal);
@@ -244,16 +288,12 @@ public class PictureProcessingUnit {
 		return (getMask() & 0x8) == 0x8 || (getMask() & 0x10) == 0x10;
 	}
 
-	private boolean inVblank() {
-		return (getStatus() >> 7) == 1;
-	}
-
 	public void setByte(int location, int value) {
 		internalMemory[location] = value;
 	}
 
 	public void resetAddressLatch() {
-		vramAddr = 0x00;
+		// vramAddr = 0x00; //TODO this isn't correct
 	}
 
 	public void writeSprites(int data) {
@@ -262,5 +302,17 @@ public class PictureProcessingUnit {
 
 	public int getBaseNameTableAddr() {
 		return (0x3 & getCtrl());
+	}
+	
+	public void outputNametable() {
+		IntStream.rangeClosed(0x2000, 0x2400).forEach(i -> {
+			System.out.print(Integer.toHexString(internalMemory[i]) + " ");
+			if((i & 0x1F) == 1F) {
+				System.out.println();
+			}
+			if((i & 0x3FF) == 0x3FF) {
+				System.out.println();
+			}
+		});
 	}
 }

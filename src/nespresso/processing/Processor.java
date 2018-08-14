@@ -81,9 +81,9 @@ public class Processor {
 	}
 
 	public void outputState() {
-		System.out.print("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase()
+		System.out.println("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase()
 				+ " Y:" + toHexString(yIndex).toUpperCase() + " S:" + toHexString(stackPointer).toUpperCase() + " P:"
-				+ getAlphaStatus() + " ");
+				+ getAlphaStatus() + " $"  + toHexString(programCounter));
 	}
 
 	private String getAlphaStatus() {
@@ -1521,7 +1521,6 @@ public class Processor {
 	}
 
 	public void start() {
-		turnOnFileOutput();
 		while (true) {
 			try {
 				if (nmi) {
