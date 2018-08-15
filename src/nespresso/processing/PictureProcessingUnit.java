@@ -95,17 +95,20 @@ public class PictureProcessingUnit {
 	private void drawOnPrerenderLine() {
 		if (currPixel == 1) {
 			clearVblank();
-		} else if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
-			incrementX();
-		} else if (currPixel == 256) {
-			incrementY();
-		} else if (currPixel == 257) {
-			horiV();
-		} else if (currPixel > 279 && currPixel < 305) {
-			vertV();
 		}
-		if (currPixel >= 321 && currPixel <= 340) {
-			fetch();
+		if (renderingIsOn()) {
+			if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
+				incrementX();
+			} else if (currPixel == 256) {
+				incrementY();
+			} else if (currPixel == 257) {
+				horiV();
+			} else if (currPixel > 279 && currPixel < 305) {
+				vertV();
+			}
+			if (currPixel >= 321 && currPixel <= 340 && renderingIsOn()) {
+				fetch();
+			}
 		}
 	}
 
@@ -152,7 +155,6 @@ public class PictureProcessingUnit {
 	public void drawOnPostrenderLine() {
 		if (currLine == 241 && currPixel == 1) {
 			setVblank();
-			outputNametable();
 		}
 	}
 
@@ -176,12 +178,17 @@ public class PictureProcessingUnit {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch0 = internalMemory[addr];
+		System.out.println(" ADDR HIGH: " + Integer.toHexString(addr) + " DATA: " + Integer.toHexString(tileLatch0));
 	}
 
 	private void fetchLowBgTileByte() {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch1 = internalMemory[addr + 8];
+		if(currPixel == 5) {
+			System.out.println("CURRENT LINE: " + currLine);
+		}
+		System.out.print("ADDR LOW: " + Integer.toHexString(addr) + " DATA: " + Integer.toHexString(tileLatch0));
 	}
 
 	private void fetchNtByte() {
@@ -200,10 +207,12 @@ public class PictureProcessingUnit {
 			return;
 		}
 		internalMemory[address] = data;
-		if ((getCtrl() & 0x4) == 0) {
-			vramAddr += 1;
-		} else {
-			vramAddr += 32;
+		if (!renderingIsOn() || (currLine > 240 && currLine <= 340)) {
+			if ((getCtrl() & 0x4) == 0) {
+				vramAddr += 1;
+			} else {
+				vramAddr += 32;
+			}
 		}
 		vramAddr &= 0x3FFF;
 	}
@@ -211,7 +220,7 @@ public class PictureProcessingUnit {
 	public void writeAddress(int addressByte) {
 		if (lowByte) {
 			vramTempAddr &= 0xfff00;
-			vramTempAddr |= data;
+			vramTempAddr |= addressByte;
 			vramAddr = vramTempAddr;
 			lowByte = false;
 		} else {
@@ -227,7 +236,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void vertV() {
-		vramAddr = 0x2000; // TODO hack to get PPU going on donkey kong
+		vramAddr = 0x2000; // TODO hack to get PPU going on donkey kong(vramAddr & 0x841F) | (vramTempAddr & 0x7BE0); 
 	}
 
 	private void incrementX() {
@@ -303,14 +312,14 @@ public class PictureProcessingUnit {
 	public int getBaseNameTableAddr() {
 		return (0x3 & getCtrl());
 	}
-	
+
 	public void outputNametable() {
 		IntStream.rangeClosed(0x2000, 0x2400).forEach(i -> {
 			System.out.print(Integer.toHexString(internalMemory[i]) + " ");
-			if((i & 0x1F) == 1F) {
+			if ((i & 0x1F) == 1F) {
 				System.out.println();
 			}
-			if((i & 0x3FF) == 0x3FF) {
+			if ((i & 0x3FF) == 0x3FF) {
 				System.out.println();
 			}
 		});
