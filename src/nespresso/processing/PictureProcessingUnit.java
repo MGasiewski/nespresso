@@ -54,8 +54,9 @@ public class PictureProcessingUnit {
 	private int busLowByte = 0x0;
 	private int busHighByte = 0x0;
 	private boolean evenFrame = true;
-	private int vramAddr = 0, vramTempAddr = 0, atByte = 0, ntByte = 0, fineXScroll = 0, tileLatch0 = 0, tileLatch1 = 0,
-			tileShiftRegister0 = 0, tileShiftRegister1 = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
+	private int vramAddr = 0, vramTempAddr = 0, nextAtByte = 0, currAtByte = 0, currAttributeIndex = 0,
+			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, tileLatch0 = 0, tileLatch1 = 0, tileShiftRegister0 = 0,
+			tileShiftRegister1 = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
 	private boolean firstSecondToggle = false, nmiPrev = false;
 	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
 
@@ -133,23 +134,29 @@ public class PictureProcessingUnit {
 		tileLatch0 >>= 1;
 		int high = tileLatch1 & 0x1;
 		tileLatch1 >>= 1;
-		int value = (high << 1) + low;
-		int color = 0;
-		switch (value) {
+		int value = (high << 1) | low; 
+		int color = getColor(currAtByte, currAttributeIndex, value);
+		image.setRGB(currPixel - 1, currLine, color);
+	}
+	
+	private int getColor(int atByte, int atIndex, int value) {
+		int paletteNumber = 0;
+		switch(atIndex) {
 		case 0:
-			color = Color.BLACK.getRGB();
+			paletteNumber = atByte & 0x3;
 			break;
 		case 1:
-			color = Color.WHITE.getRGB();
+			paletteNumber = (atByte & 0xC) >> 2;
 			break;
 		case 2:
-			color = Color.YELLOW.getRGB();
+			paletteNumber = (atByte & 0x30) >> 4;
 			break;
 		case 3:
-			color = Color.RED.getRGB();
+			paletteNumber = (atByte & 0xC0) >> 6;
 			break;
 		}
-		image.setRGB(currPixel - 1, currLine, color);
+		int paletteAddress = 0x3F00 | (paletteNumber << 2) | value;
+		return ColorLookup.get(internalMemory[paletteAddress]);
 	}
 
 	public void drawOnPostrenderLine() {
@@ -178,17 +185,12 @@ public class PictureProcessingUnit {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch0 = internalMemory[addr];
-		System.out.println(" ADDR HIGH: " + Integer.toHexString(addr) + " DATA: " + Integer.toHexString(tileLatch0));
 	}
 
 	private void fetchLowBgTileByte() {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
 		tileLatch1 = internalMemory[addr + 8];
-		if(currPixel == 5) {
-			System.out.println("CURRENT LINE: " + currLine);
-		}
-		System.out.print("ADDR LOW: " + Integer.toHexString(addr) + " DATA: " + Integer.toHexString(tileLatch0));
 	}
 
 	private void fetchNtByte() {
@@ -198,7 +200,13 @@ public class PictureProcessingUnit {
 
 	private void fetchAtByte() {
 		int attrAddr = 0x23C0 | (vramAddr & 0x0C00) | ((vramAddr >> 4) & 0x38) | ((vramAddr >> 2) & 0x07);
-		atByte = internalMemory[attrAddr];
+		currAtByte = nextAtByte;
+		currAttributeIndex = nextAttributeIndex;
+		nextAttributeIndex = vramAddr % 2 == 0 ? 0 : 1;
+		int coarseY = vramAddr & 0b1111100000;
+		coarseY >>= 5;
+		nextAttributeIndex += coarseY % 2 == 0? 0 : 2;
+		nextAtByte = internalMemory[attrAddr];
 	}
 
 	public void writeToVram(int data) {
@@ -236,7 +244,8 @@ public class PictureProcessingUnit {
 	}
 
 	private void vertV() {
-		vramAddr = 0x2000; // TODO hack to get PPU going on donkey kong(vramAddr & 0x841F) | (vramTempAddr & 0x7BE0); 
+		vramAddr = 0x2000; // TODO hack to get PPU going on donkey kong(vramAddr & 0x841F) | (vramTempAddr
+							// & 0x7BE0);
 	}
 
 	private void incrementX() {
