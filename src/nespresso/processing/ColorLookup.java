@@ -2,7 +2,7 @@ package nespresso.processing;
 
 import java.util.HashMap;
 import java.util.Map;
-
+import java.awt.Color;
 import java.awt.color.*;
 
 public class ColorLookup {
@@ -78,7 +78,7 @@ public class ColorLookup {
 	}
 
 	private static int convert(int red, int green, int blue) {
-		return red << 16 + green << 8 + blue;
+		return new Color(red, green, blue).getRGB();
 	}
 	
 	public static int get(int hex) {

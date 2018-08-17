@@ -1,8 +1,9 @@
 package nespresso.processing;
 
 import java.awt.Canvas;
-import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.stream.IntStream;
 
 import lombok.Getter;
@@ -48,15 +49,16 @@ public class PictureProcessingUnit {
 	@Getter
 	@Setter
 	private int scroll = 0;
+	private Queue<Integer> lowTileBytes = new LinkedList<>();
+	private Queue<Integer> highTileBytes = new LinkedList<>();
+	private int currentLowTileByte = 0;
+	private int currentHighTileByte = 0;
 	private int currPixel = 0;
 	private int currLine = 0;
 	private boolean lowByte = false;
-	private int busLowByte = 0x0;
-	private int busHighByte = 0x0;
 	private boolean evenFrame = true;
 	private int vramAddr = 0, vramTempAddr = 0, nextAtByte = 0, currAtByte = 0, currAttributeIndex = 0,
-			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, tileLatch0 = 0, tileLatch1 = 0, tileShiftRegister0 = 0,
-			tileShiftRegister1 = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
+			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
 	private boolean firstSecondToggle = false, nmiPrev = false;
 	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
 
@@ -101,7 +103,7 @@ public class PictureProcessingUnit {
 			if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
 				incrementX();
 			} else if (currPixel == 256) {
-				incrementY();
+				incrementY(); 
 			} else if (currPixel == 257) {
 				horiV();
 			} else if (currPixel > 279 && currPixel < 305) {
@@ -130,18 +132,20 @@ public class PictureProcessingUnit {
 	}
 
 	private void addPixelToBuffer() {
-		int low = tileLatch0 & 0x1;
-		tileLatch0 >>= 1;
-		int high = tileLatch1 & 0x1;
-		tileLatch1 >>= 1;
-		int value = (high << 1) | low; 
+		int low = currentLowTileByte >> 7;
+		currentLowTileByte <<= 1;
+		currentLowTileByte &= 0xFF;
+		int high = currentHighTileByte >> 7;
+		currentHighTileByte <<= 1;
+		currentHighTileByte &= 0xFF;
+		int value = (high << 1) | low;
 		int color = getColor(currAtByte, currAttributeIndex, value);
 		image.setRGB(currPixel - 1, currLine, color);
 	}
-	
+
 	private int getColor(int atByte, int atIndex, int value) {
 		int paletteNumber = 0;
-		switch(atIndex) {
+		switch (atIndex) {
 		case 0:
 			paletteNumber = atByte & 0x3;
 			break;
@@ -168,6 +172,12 @@ public class PictureProcessingUnit {
 	private void fetch() {
 		if (currPixel % 8 == 1) {
 			fetchNtByte();
+			if (!highTileBytes.isEmpty()) {
+				currentHighTileByte = highTileBytes.remove();
+			}
+			if (!lowTileBytes.isEmpty()) {
+				currentLowTileByte = lowTileBytes.remove();
+			}
 		} else if (currPixel % 8 == 3) {
 			fetchAtByte();
 		} else if (currPixel % 8 == 5) {
@@ -178,19 +188,19 @@ public class PictureProcessingUnit {
 	}
 
 	private int getPatternTableHalf() {
-		return (getCtrl() & 0x20) == 0x20 ? 0x1000 : 0x0;
+		return (getCtrl() & 0x10) == 0x10 ? 0x1000 : 0x0;
 	}
 
 	private void fetchHighBgTileByte() {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
-		tileLatch0 = internalMemory[addr];
+		highTileBytes.add(internalMemory[addr]);
 	}
 
 	private void fetchLowBgTileByte() {
 		int fineY = (vramAddr >> 12) & 0x7;
 		int addr = getPatternTableHalf() + ntByte * 16 + fineY;
-		tileLatch1 = internalMemory[addr + 8];
+		lowTileBytes.add(internalMemory[addr + 8]);
 	}
 
 	private void fetchNtByte() {
@@ -205,7 +215,7 @@ public class PictureProcessingUnit {
 		nextAttributeIndex = vramAddr % 2 == 0 ? 0 : 1;
 		int coarseY = vramAddr & 0b1111100000;
 		coarseY >>= 5;
-		nextAttributeIndex += coarseY % 2 == 0? 0 : 2;
+		nextAttributeIndex += coarseY % 2 == 0 ? 0 : 2;
 		nextAtByte = internalMemory[attrAddr];
 	}
 
@@ -215,6 +225,11 @@ public class PictureProcessingUnit {
 			return;
 		}
 		internalMemory[address] = data;
+		if(address >= 0x2000 && address < 0x2400) {
+			internalMemory[address + 0x400] = data;
+		}else if(address >= 0x2800 && address < 0x3000) {
+			internalMemory[address + 0x400] = data;
+		}
 		if (!renderingIsOn() || (currLine > 240 && currLine <= 340)) {
 			if ((getCtrl() & 0x4) == 0) {
 				vramAddr += 1;
