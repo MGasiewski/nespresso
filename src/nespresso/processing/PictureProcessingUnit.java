@@ -59,7 +59,7 @@ public class PictureProcessingUnit {
 	private boolean evenFrame = true;
 	private int vramAddr = 0, vramTempAddr = 0, nextAtByte = 0, currAtByte = 0, currAttributeIndex = 0,
 			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
-	private boolean firstSecondToggle = false, nmiPrev = false;
+	private boolean firstSecondToggle = false, nmiPrevious = false;
 	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
 
 	public static synchronized PictureProcessingUnit getInstance() {
@@ -71,7 +71,7 @@ public class PictureProcessingUnit {
 
 	private PictureProcessingUnit() {
 	}
-
+	
 	public void draw() {
 		if (currLine == -1) {
 			drawOnPrerenderLine();
@@ -100,26 +100,26 @@ public class PictureProcessingUnit {
 			clearVblank();
 		}
 		if (renderingIsOn()) {
-			if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
+			if (currPixel % 8 == 0 && ((currPixel > 0 && currPixel < 256) || currPixel > 321)) {
 				incrementX();
 			} else if (currPixel == 256) {
-				incrementY(); 
+				incrementY();
 			} else if (currPixel == 257) {
 				horiV();
 			} else if (currPixel > 279 && currPixel < 305) {
 				vertV();
 			}
-			if (currPixel >= 321 && currPixel <= 340 && renderingIsOn()) {
+			if (currPixel >= 321 && currPixel <= 336 && renderingIsOn()) {
 				fetch();
 			}
 		}
 	}
 
 	private void drawOnVisibleLine() {
-		if (currPixel < 257 || currPixel > 320) {
+		if (currPixel < 249 || (currPixel > 320 && currPixel < 337)) {
 			fetch();
 		}
-		if (currPixel % 8 == 0 && (currPixel < 256 || currPixel > 321)) {
+		if (currPixel % 8 == 0 && ((currPixel > 0 && currPixel < 256) || currPixel > 321)) {
 			incrementX();
 		} else if (currPixel == 256) {
 			incrementY();
@@ -186,6 +186,14 @@ public class PictureProcessingUnit {
 			fetchHighBgTileByte();
 		}
 	}
+	
+	public void nmiChange() {
+		boolean nmi = nmiOutput() && nmiOccurred();
+		if(nmi && !nmiPrevious){
+			processor.setNmi(true);
+		}
+		nmiPrevious = nmi;
+	}
 
 	private int getPatternTableHalf() {
 		return (getCtrl() & 0x10) == 0x10 ? 0x1000 : 0x0;
@@ -225,9 +233,9 @@ public class PictureProcessingUnit {
 			return;
 		}
 		internalMemory[address] = data;
-		if(address >= 0x2000 && address < 0x2400) {
+		if (address >= 0x2000 && address < 0x2400) {
 			internalMemory[address + 0x400] = data;
-		}else if(address >= 0x2800 && address < 0x3000) {
+		} else if (address >= 0x2800 && address < 0x3000) {
 			internalMemory[address + 0x400] = data;
 		}
 		if (!renderingIsOn() || (currLine > 240 && currLine <= 340)) {
@@ -255,7 +263,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void horiV() {
-		vramAddr = (vramAddr & 0xFBE0) | (vramTempAddr & 0x041F);
+		vramAddr = (vramAddr & 0xFBE0) | 0x0; //(vramTempAddr & 0x041F); TODO another hack to get this working
 	}
 
 	private void vertV() {
@@ -264,7 +272,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void incrementX() {
-		if ((vramAddr & 0x1F) == 31) {
+		if ((vramAddr & 0x001F) == 31) {
 			vramAddr &= 0xFFE0;
 			vramAddr ^= 0x0400;
 		} else {
@@ -301,20 +309,13 @@ public class PictureProcessingUnit {
 	private void setVblank() {
 		int newVal = getStatus() | 0x80;
 		setStatus(newVal);
-		setCtrl(getCtrl() | 0x80);
+		nmiChange();
 	}
 
 	public void clearVblank() {
-		if (nmiOutput()) {
-			if (!nmiPrev) {
-				nmiPrev = true;
-			} else {
-				processor.setNmi(true);
-				nmiPrev = false;
-			}
-		}
 		int newVal = getStatus() & 0b01111111;
 		setStatus(newVal);
+		nmiChange();
 	}
 
 	private boolean renderingIsOn() {
@@ -335,6 +336,18 @@ public class PictureProcessingUnit {
 
 	public int getBaseNameTableAddr() {
 		return (0x3 & getCtrl());
+	}
+	
+	public void writeScroll(int data) {
+		if(lowByte) {
+			vramTempAddr = (vramTempAddr & 0xFFE0) | (data >> 3);
+			fineXScroll = data & 7;
+			lowByte = !lowByte;
+		}else {
+			vramTempAddr = (vramTempAddr & 0x8FFF | ((data & 7) << 12));
+			vramTempAddr = (vramTempAddr & 0xFC1F) | ((data & 0xF8) << 2);
+			lowByte = !lowByte;
+		}
 	}
 
 	public void outputNametable() {

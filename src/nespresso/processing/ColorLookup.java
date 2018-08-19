@@ -3,10 +3,9 @@ package nespresso.processing;
 import java.util.HashMap;
 import java.util.Map;
 import java.awt.Color;
-import java.awt.color.*;
 
 public class ColorLookup {
-	private static Map<Integer, Integer> lookup = new HashMap<>();
+	private static Map<Integer, Color> lookup = new HashMap<>();
 	static {
 		lookup.put(0x0, convert(84, 84, 84));
 		lookup.put(0x1, convert(0, 30, 116));
@@ -77,11 +76,11 @@ public class ColorLookup {
 		lookup.put(0x3F, convert(0, 0, 0));
 	}
 
-	private static int convert(int red, int green, int blue) {
-		return new Color(red, green, blue).getRGB();
+	private static Color convert(int red, int green, int blue) {
+		return new Color(red, green, blue);
 	}
 	
 	public static int get(int hex) {
-		return lookup.get(hex);
+		return lookup.get(hex).getRGB();
 	}
 }

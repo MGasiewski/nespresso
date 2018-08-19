@@ -18,8 +18,8 @@ public class NesController {
 	private PictureProcessingUnit ppu;
 	private String donkeyKong = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\donkey kong.nes"; 
 	private String nesTest = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\nestest.nes";
-	private final int HEIGHT = 240;
-	private final int WIDTH = 256;
+	private final int HEIGHT = 270;
+	private final int WIDTH = 266;
 	
 	public void initializeNes() {
 		ppu = PictureProcessingUnit.getInstance();
