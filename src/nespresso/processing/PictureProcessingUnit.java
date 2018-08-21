@@ -2,6 +2,7 @@ package nespresso.processing;
 
 import java.awt.Canvas;
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.stream.IntStream;
@@ -61,6 +62,7 @@ public class PictureProcessingUnit {
 			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
 	private boolean firstSecondToggle = false, nmiPrevious = false;
 	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
+	private int[] scanlineSpriteIndices = new int[8];
 
 	public static synchronized PictureProcessingUnit getInstance() {
 		if (ppu == null) {
@@ -71,7 +73,7 @@ public class PictureProcessingUnit {
 
 	private PictureProcessingUnit() {
 	}
-	
+
 	public void draw() {
 		if (currLine == -1) {
 			drawOnPrerenderLine();
@@ -116,6 +118,9 @@ public class PictureProcessingUnit {
 	}
 
 	private void drawOnVisibleLine() {
+		if (currPixel == 0) {
+			spriteEvaluation();
+		}
 		if (currPixel < 249 || (currPixel > 320 && currPixel < 337)) {
 			fetch();
 		}
@@ -131,6 +136,22 @@ public class PictureProcessingUnit {
 		}
 	}
 
+	private void spriteEvaluation() {
+		Arrays.fill(scanlineSpriteIndices, -1);
+		int spriteHeight = (getCtrl() & 0x20) == 0x20 ? 16 : 8;
+		int count = 0;
+		for (int i = 0; i < primaryOam.length; i += 4) {
+			if (primaryOam[i] == 255) {
+				continue; // Necessary because baloney sprites are registered as 255
+			}
+			int y0 = primaryOam[0];
+			int y1 = primaryOam[0] + spriteHeight;
+			if (currLine >= y0 && currLine <= y1 && count < 8) {
+				scanlineSpriteIndices[count++] = i;
+			}
+		}
+	}
+
 	private void addPixelToBuffer() {
 		int low = currentLowTileByte >> 7;
 		currentLowTileByte <<= 1;
@@ -138,12 +159,75 @@ public class PictureProcessingUnit {
 		int high = currentHighTileByte >> 7;
 		currentHighTileByte <<= 1;
 		currentHighTileByte &= 0xFF;
-		int value = (high << 1) | low;
-		int color = getColor(currAtByte, currAttributeIndex, value);
-		image.setRGB(currPixel - 1, currLine, color);
+		int value = (low << 1) | high;
+		int spriteIndex = getSpriteOnX();
+		int spriteColor = 0;
+		int ntColor = 0;
+		if (spriteIndex >= 0) {
+			spriteColor = getSpriteColor(spriteIndex);
+		} else {
+			ntColor = getNametableColor(currAtByte, currAttributeIndex, value);
+		}
+		image.setRGB(currPixel - 1, currLine, muxColor(spriteColor, ntColor)); // TODO need to evaluate spriteColor and
+																				// mux it with ntColor
 	}
 
-	private int getColor(int atByte, int atIndex, int value) {
+	private int muxColor(int spriteColor, int ntColor) {
+		if (spriteColor > 0) { //TODO mux properly
+			return ColorLookup.get(spriteColor);
+		} else {
+			return ntColor;
+		}
+	}
+
+	private int getSpriteColor(int spriteIndex) {
+		// TODO horizontal and vertical flip logic
+		int originX = primaryOam[spriteIndex + 3], originY = primaryOam[spriteIndex];
+		int xOffset = currPixel - originX, yOffset = currLine - originY + 1;
+		int colorIndex = 0;
+		int paletteOffset = 0;
+		int colorMemLoc = 0;
+		boolean eightPixels = (getCtrl() & 0x20) == 0x20 ? false : true;
+		if (eightPixels) {
+			int spriteTable = (getCtrl() & 0x8) == 0x8 ? 0x1000 : 0x0;
+			int spriteByte0 = internalMemory[spriteTable + primaryOam[spriteIndex+1] + yOffset];
+			int spriteByte1 = internalMemory[spriteTable + primaryOam[spriteIndex+1] + yOffset + 8];
+			spriteByte0 >>= xOffset;
+			spriteByte1 >>= xOffset;
+			colorIndex = ((spriteByte1 & 0x1) << 1) | (spriteByte0 & 0x1);
+			paletteOffset = primaryOam[spriteIndex + 2] & 0x3;
+		} else {
+			// TODO 16 pixel sprites
+		}
+		switch (paletteOffset) {
+		case 0:
+			colorMemLoc = 0x3f11 + colorIndex;
+			break;
+		case 1:
+			colorMemLoc = 0x3f15 + colorIndex;
+			break;
+		case 2:
+			colorMemLoc = 0x3f19 + colorIndex;
+			break;
+		case 3:
+			colorMemLoc = 0x3f1d + colorIndex;
+			break;
+		}
+		return internalMemory[colorMemLoc];
+	}
+
+	private int getSpriteOnX() {
+		for (int index : scanlineSpriteIndices) {
+			int x0 = primaryOam[index + 3];
+			int x1 = primaryOam[index + 3] + 8;
+			if (currPixel >= x0 && currPixel <= x1) {
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	private int getNametableColor(int atByte, int atIndex, int value) {
 		int paletteNumber = 0;
 		switch (atIndex) {
 		case 0:
@@ -186,10 +270,10 @@ public class PictureProcessingUnit {
 			fetchHighBgTileByte();
 		}
 	}
-	
+
 	public void nmiChange() {
 		boolean nmi = nmiOutput() && nmiOccurred();
-		if(nmi && !nmiPrevious){
+		if (nmi && !nmiPrevious) {
 			processor.setNmi(true);
 		}
 		nmiPrevious = nmi;
@@ -263,7 +347,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void horiV() {
-		vramAddr = (vramAddr & 0xFBE0) | 0x0; //(vramTempAddr & 0x041F); TODO another hack to get this working
+		vramAddr = (vramAddr & 0xFBE0) | 0x0; // (vramTempAddr & 0x041F); TODO another hack to get this working
 	}
 
 	private void vertV() {
@@ -337,13 +421,13 @@ public class PictureProcessingUnit {
 	public int getBaseNameTableAddr() {
 		return (0x3 & getCtrl());
 	}
-	
+
 	public void writeScroll(int data) {
-		if(lowByte) {
+		if (lowByte) {
 			vramTempAddr = (vramTempAddr & 0xFFE0) | (data >> 3);
 			fineXScroll = data & 7;
 			lowByte = !lowByte;
-		}else {
+		} else {
 			vramTempAddr = (vramTempAddr & 0x8FFF | ((data & 7) << 12));
 			vramTempAddr = (vramTempAddr & 0xFC1F) | ((data & 0xF8) << 2);
 			lowByte = !lowByte;
@@ -360,5 +444,13 @@ public class PictureProcessingUnit {
 				System.out.println();
 			}
 		});
+	}
+
+	public void outputOam() {
+		for (int i = 0; i < 256; i += 4) {
+			System.out.println(Integer.toBinaryString(primaryOam[0]) + " " + Integer.toBinaryString(primaryOam[1]) + " "
+					+ Integer.toBinaryString(primaryOam[2]) + " " + Integer.toBinaryString(primaryOam[3]));
+		}
+		System.out.println();
 	}
 }
