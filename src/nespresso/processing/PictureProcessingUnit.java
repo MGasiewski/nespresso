@@ -59,7 +59,7 @@ public class PictureProcessingUnit {
 	private boolean lowByte = false;
 	private boolean evenFrame = true;
 	private int vramAddr = 0, vramTempAddr = 0, nextAtByte = 0, currAtByte = 0, currAttributeIndex = 0,
-			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0, paletteShiftRegister0 = 0, paletteShiftRegister1 = 0;
+			nextAttributeIndex = 0, ntByte = 0, fineXScroll = 0;
 	private boolean firstSecondToggle = false, nmiPrevious = false;
 	private BufferedImage image = new BufferedImage(256, 240, BufferedImage.TYPE_INT_RGB);
 	private int[] scanlineSpriteIndices = new int[8];
@@ -144,8 +144,8 @@ public class PictureProcessingUnit {
 			if (primaryOam[i] == 255) {
 				continue; // Necessary because baloney sprites are registered as 255
 			}
-			int y0 = primaryOam[0];
-			int y1 = primaryOam[0] + spriteHeight;
+			int y0 = primaryOam[i];
+			int y1 = primaryOam[i] + spriteHeight - 1;
 			if (currLine >= y0 && currLine <= y1 && count < 8) {
 				scanlineSpriteIndices[count++] = i;
 			}
@@ -170,10 +170,10 @@ public class PictureProcessingUnit {
 		}
 		image.setRGB(currPixel - 1, currLine, muxColor(spriteColor, ntColor)); // TODO need to evaluate spriteColor and
 																				// mux it with ntColor
-	}
+		}
 
 	private int muxColor(int spriteColor, int ntColor) {
-		if (spriteColor > 0) { //TODO mux properly
+		if (spriteColor > 0) { // TODO mux properly
 			return ColorLookup.get(spriteColor);
 		} else {
 			return ntColor;
@@ -181,36 +181,47 @@ public class PictureProcessingUnit {
 	}
 
 	private int getSpriteColor(int spriteIndex) {
-		// TODO horizontal and vertical flip logic
+		// TODO vertical flip logic
 		int originX = primaryOam[spriteIndex + 3], originY = primaryOam[spriteIndex];
-		int xOffset = currPixel - originX, yOffset = currLine - originY + 1;
+		int xOffset = currPixel - originX, yOffset = currLine - originY;
 		int colorIndex = 0;
 		int paletteOffset = 0;
 		int colorMemLoc = 0;
-		boolean eightPixels = (getCtrl() & 0x20) == 0x20 ? false : true;
+		boolean eightPixels = (getCtrl() & 0x20) != 0x20;
+		boolean horizontalFlip = (primaryOam[spriteIndex + 2] & 0x40) == 0x40;
 		if (eightPixels) {
 			int spriteTable = (getCtrl() & 0x8) == 0x8 ? 0x1000 : 0x0;
-			int spriteByte0 = internalMemory[spriteTable + primaryOam[spriteIndex+1] + yOffset];
-			int spriteByte1 = internalMemory[spriteTable + primaryOam[spriteIndex+1] + yOffset + 8];
-			spriteByte0 >>= xOffset;
-			spriteByte1 >>= xOffset;
+			int spriteByte0 = internalMemory[spriteTable + (primaryOam[spriteIndex + 1] << 4) + yOffset];
+			int spriteByte1 = internalMemory[spriteTable + (primaryOam[spriteIndex + 1] << 4) + yOffset + 8];
+			if (horizontalFlip) {
+				spriteByte0 >>= xOffset;
+				spriteByte1 >>= xOffset;
+			} else {
+				spriteByte0 <<= xOffset;
+				spriteByte0 = (spriteByte0 & 0x80) == 0x80 ? 1 : 0;
+				spriteByte1 <<= xOffset;
+				spriteByte1 = (spriteByte1 & 0x80) == 0x80 ? 1 : 0;
+			}
 			colorIndex = ((spriteByte1 & 0x1) << 1) | (spriteByte0 & 0x1);
 			paletteOffset = primaryOam[spriteIndex + 2] & 0x3;
 		} else {
 			// TODO 16 pixel sprites
 		}
+		if (colorIndex == 0) {
+			return internalMemory[0x3f00]; // If 0, return universal background color
+		}
 		switch (paletteOffset) {
 		case 0:
-			colorMemLoc = 0x3f11 + colorIndex;
+			colorMemLoc = 0x3f10 + colorIndex;
 			break;
 		case 1:
-			colorMemLoc = 0x3f15 + colorIndex;
+			colorMemLoc = 0x3f14 + colorIndex;
 			break;
 		case 2:
-			colorMemLoc = 0x3f19 + colorIndex;
+			colorMemLoc = 0x3f18 + colorIndex;
 			break;
 		case 3:
-			colorMemLoc = 0x3f1d + colorIndex;
+			colorMemLoc = 0x3f1c + colorIndex;
 			break;
 		}
 		return internalMemory[colorMemLoc];
@@ -219,7 +230,7 @@ public class PictureProcessingUnit {
 	private int getSpriteOnX() {
 		for (int index : scanlineSpriteIndices) {
 			int x0 = primaryOam[index + 3];
-			int x1 = primaryOam[index + 3] + 8;
+			int x1 = primaryOam[index + 3] + 7;
 			if (currPixel >= x0 && currPixel <= x1) {
 				return index;
 			}
