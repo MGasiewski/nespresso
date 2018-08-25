@@ -53,6 +53,7 @@ public class Processor {
 	@Setter
 	private PictureProcessingUnit ppu;
 	private List<String> operationCache = new ArrayList<>();
+	public int cpuCycles = 0;
 
 	public Processor(Memory memory) {
 		setMemory(memory);
@@ -513,10 +514,12 @@ public class Processor {
 	private void push(int operand) {
 		memory.setByte(stackPointer + 0x100, operand);
 		stackPointer -= 1;
+		stackPointer &= 0xFF;
 	}
 
 	private int pop() {
 		stackPointer += 1;
+		stackPointer &= 0xFF;
 		return memory.getByte(stackPointer + 0x100);
 	}
 
@@ -569,7 +572,6 @@ public class Processor {
 		default:
 			throw new IncorrectOpcodeException();
 		}
-		currentCycles = 2;
 		zeroFlag = accumulator == 0;
 		carryFlag = (original & 0b00000001) == 1;
 		signFlag = result >> 7 == 1;
@@ -715,12 +717,12 @@ public class Processor {
 		int lowByte = programCounter % 0x100;
 		push(highByte);
 		push(lowByte);
-		softwareInterruptFlag = true;
 		// does Processor status change?
-		push(getStatus());
+		push(getStatus() | 0x18 );
 		programCounter = 0;
 		programCounter = memory.getByte(0xFFFF) * ENDIAN_MULT;
 		programCounter += memory.getByte(0xFFFE);
+		softwareInterruptFlag = true;
 		currentCycles = 7;
 	}
 
@@ -812,7 +814,7 @@ public class Processor {
 			}
 			break;
 		case 0xF9:
-			subtrahend = memory.getByte(indirectX(operand0));
+			subtrahend = memory.getByte(indirectY(operand0));
 			accumulator -= subtrahend;
 			accumulator -= borrow;
 			currentCycles = 4;

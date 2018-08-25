@@ -50,12 +50,13 @@ public class PictureProcessingUnit {
 	@Getter
 	@Setter
 	private int scroll = 0;
+	private static final int BACKGROUND_COLOR = 0x3F00;
 	private Queue<Integer> lowTileBytes = new LinkedList<>();
 	private Queue<Integer> highTileBytes = new LinkedList<>();
 	private int currentLowTileByte = 0;
 	private int currentHighTileByte = 0;
 	private int currPixel = 0;
-	private int currLine = 0;
+	private int currLine = -1;
 	private boolean lowByte = false;
 	private boolean evenFrame = true;
 	private int vramAddr = 0, vramTempAddr = 0, nextAtByte = 0, currAtByte = 0, currAttributeIndex = 0,
@@ -87,7 +88,11 @@ public class PictureProcessingUnit {
 			currPixel = 0;
 			currLine += 1;
 			if (currLine == 261) {
+				evenFrame = !evenFrame;
 				currLine = -1;
+				if (!evenFrame && renderingIsOn()) {
+					currPixel += 1;
+				}
 				canvas.getGraphics().drawImage(image, 0, 0, canvas);
 			}
 		}
@@ -165,15 +170,14 @@ public class PictureProcessingUnit {
 		int ntColor = 0;
 		if (spriteIndex >= 0) {
 			spriteColor = getSpriteColor(spriteIndex);
-		} else {
-			ntColor = getNametableColor(currAtByte, currAttributeIndex, value);
 		}
-		image.setRGB(currPixel - 1, currLine, muxColor(spriteColor, ntColor)); // TODO need to evaluate spriteColor and
-																				// mux it with ntColor
-		}
+		ntColor = getNametableColor(currAtByte, currAttributeIndex, value);
+		image.setRGB(currPixel - 1, currLine, muxColor(spriteColor, ntColor)); // TODO correct implementation for
+																				// muxColor
+	}
 
 	private int muxColor(int spriteColor, int ntColor) {
-		if (spriteColor > 0) { // TODO mux properly
+		if (spriteColor > 0 && spriteColor != internalMemory[BACKGROUND_COLOR]) {
 			return ColorLookup.get(spriteColor);
 		} else {
 			return ntColor;
@@ -208,7 +212,7 @@ public class PictureProcessingUnit {
 			// TODO 16 pixel sprites
 		}
 		if (colorIndex == 0) {
-			return internalMemory[0x3f00]; // If 0, return universal background color
+			return internalMemory[BACKGROUND_COLOR]; // If 0, return universal background color
 		}
 		switch (paletteOffset) {
 		case 0:

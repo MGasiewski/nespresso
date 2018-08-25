@@ -36,7 +36,7 @@ public class NromMapper extends Memory {
 					eightKbPrgUnits = i;
 				}else if(count == 9) {
 					
-				}else if(count > 15 && count < 16384 * sixteenKbPrgUnits + 15) {
+				}else if(count > 15 && count < 16384 * sixteenKbPrgUnits + 16) {
 					if(sixteenKbPrgUnits == 1) {
 						int address0 = count - 16 + 0x8000;
 						int address1 = count - 16 + 0xC000;

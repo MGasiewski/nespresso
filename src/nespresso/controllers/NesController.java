@@ -18,13 +18,14 @@ public class NesController {
 	private PictureProcessingUnit ppu;
 	private String donkeyKong = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\donkey kong.nes"; 
 	private String nesTest = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\nestest.nes";
+	private String test = "C:\\Users\\Matt\\nes-test-roms\\cpu_timing_test6\\cpu_timing_test.nes";
 	private final int HEIGHT = 270;
 	private final int WIDTH = 266;
 	
 	public void initializeNes() {
 		ppu = PictureProcessingUnit.getInstance();
 		try {
-			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
+			memory = new NromMapper(new FileInputStream(test), ppu);
 		} catch (FileNotFoundException e) {
 			log.error("Cannot find rom");
 			e.printStackTrace();
