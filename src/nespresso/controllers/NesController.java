@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import javax.swing.JFrame;
 
 import lombok.extern.slf4j.Slf4j;
+import nespresso.memory.MMC1Mapper;
 import nespresso.memory.Memory;
 import nespresso.memory.NromMapper;
 import nespresso.processing.PictureProcessingUnit;
@@ -25,7 +26,7 @@ public class NesController {
 	public void initializeNes() {
 		ppu = PictureProcessingUnit.getInstance();
 		try {
-			memory = new NromMapper(new FileInputStream(test), ppu);
+			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
 		} catch (FileNotFoundException e) {
 			log.error("Cannot find rom");
 			e.printStackTrace();
@@ -56,5 +57,4 @@ public class NesController {
 		frame.setVisible(true);
 		return canvas;
 	}
-	
 }

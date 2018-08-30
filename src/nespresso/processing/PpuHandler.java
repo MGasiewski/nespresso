@@ -52,7 +52,8 @@ public class PpuHandler {
 			break;
 		case 0x14:
 			PictureProcessingUnit.getInstance().writeSprites(data);
-			//TODO this costs a high number of cycles, so implement that
+			int cycles = PictureProcessingUnit.getInstance().getProcessor().getCurrentCycles() + 513;
+			PictureProcessingUnit.getInstance().getProcessor().setCurrentCycles(cycles);
 			break;
 		}
 		

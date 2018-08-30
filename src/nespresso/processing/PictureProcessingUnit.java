@@ -15,6 +15,9 @@ import nespresso.memory.Memory;
 @Slf4j
 public class PictureProcessingUnit {
 
+	@Getter
+	@Setter
+	private int totalPpuCycles = 0;
 	private static PictureProcessingUnit ppu;
 	@Getter
 	@Setter
@@ -84,6 +87,7 @@ public class PictureProcessingUnit {
 			drawOnPostrenderLine();
 		}
 		currPixel += 1;
+		totalPpuCycles += 1;
 		if (currPixel == 341) {
 			currPixel = 0;
 			currLine += 1;
@@ -409,12 +413,14 @@ public class PictureProcessingUnit {
 		int newVal = getStatus() | 0x80;
 		setStatus(newVal);
 		nmiChange();
+		//System.out.println("Vblank set PPU Cycles: " + totalPpuCycles + " CPU Cycles: " + processor.getTotalCycles());
 	}
 
 	public void clearVblank() {
 		int newVal = getStatus() & 0b01111111;
 		setStatus(newVal);
 		nmiChange();
+		//System.out.println("Vblank cleared PPU Cycles: " + totalPpuCycles + " CPU Cycles: " + processor.getTotalCycles());
 	}
 
 	private boolean renderingIsOn() {

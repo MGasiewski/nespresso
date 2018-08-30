@@ -18,6 +18,9 @@ import nespresso.memory.Memory;
 public class Processor {
 	@Getter
 	@Setter
+	private int totalCycles = 0;
+	@Getter
+	@Setter
 	private boolean nmi;
 	@Getter
 	private int accumulator = 0;
@@ -48,6 +51,7 @@ public class Processor {
 	@Setter
 	private Memory memory;
 	@Getter
+	@Setter
 	private int currentCycles = 0;
 	@Getter
 	@Setter
@@ -84,7 +88,7 @@ public class Processor {
 	public void outputState() {
 		System.out.println("A:" + toHexString(accumulator).toUpperCase() + " X:" + toHexString(xIndex).toUpperCase()
 				+ " Y:" + toHexString(yIndex).toUpperCase() + " S:" + toHexString(stackPointer).toUpperCase() + " P:"
-				+ getAlphaStatus() + " $"  + toHexString(programCounter));
+				+ getAlphaStatus() + " $" + toHexString(programCounter));
 	}
 
 	private String getAlphaStatus() {
@@ -718,7 +722,7 @@ public class Processor {
 		push(highByte);
 		push(lowByte);
 		// does Processor status change?
-		push(getStatus() | 0x18 );
+		push(getStatus() | 0x18);
 		programCounter = 0;
 		programCounter = memory.getByte(0xFFFF) * ENDIAN_MULT;
 		programCounter += memory.getByte(0xFFFE);
@@ -960,7 +964,7 @@ public class Processor {
 			memory.setByte(convertOperandsToAddress(operand0, operand1), result);
 			break;
 		case 0xDE:
-			result = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			result = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)) - 1;
 			result = makeConversionIfNecessary(result);
 			currentCycles = 7;
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), result);
@@ -974,7 +978,7 @@ public class Processor {
 
 	public int makeConversionIfNecessary(int result) {
 		if (result < 0) {
-			return 0x100 + result;
+			return 0xFF + result + 1;
 		} else {
 			return result;
 		}
@@ -1140,22 +1144,22 @@ public class Processor {
 		int newVal = -1;
 		switch (opcode) {
 		case 0xE6:
-			newVal = (memory.getByte(operand0) + 1) % 0x100;
+			newVal = (memory.getByte(operand0) + 1) & 0xFF;
 			memory.setByte(operand0, newVal);
 			currentCycles = 5;
 			break;
 		case 0xF6:
-			newVal = (memory.getByte(operand0 + xIndex)) % 0x100;
+			newVal = (memory.getByte(operand0 + xIndex) +1) & 0xFF;
 			memory.setByte(operand0, newVal);
 			currentCycles = 6;
 			break;
 		case 0xEE:
-			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1)) + 1) % 0x100;
+			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1)) + 1) & 0xFF;
 			memory.setByte(convertOperandsToAddress(operand0, operand1), newVal);
 			currentCycles = 6;
 			break;
 		case 0xFE:
-			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)) + 1) % 0x100;
+			newVal = (memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex)) + 1) & 0xFF;
 			memory.setByte(convertOperandsToAddress(operand0, operand1, xIndex), newVal);
 			currentCycles = 7;
 			break;
@@ -1573,6 +1577,7 @@ public class Processor {
 				log.error("Most recent operations: {}", operationCache);
 				throw new RuntimeException();
 			}
+			totalCycles += currentCycles;
 			for (int i = 0; i < currentCycles * 3; i++) {
 				ppu.draw();
 			}
