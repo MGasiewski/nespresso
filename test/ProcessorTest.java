@@ -69,18 +69,6 @@ public class ProcessorTest {
 	}
 
 	@Test
-	public void bccTest() throws UnknownOpcodeException, IncorrectOpcodeException {
-		int previous0 = processor.getProgramCounter();
-		processor.runInstruction(0x90, 0x50, -1);
-		assertTrue(processor.getProgramCounter() == previous0 + 0x50);
-		assertTrue(processor.getCurrentCycles() == 3);
-		int previous1 = processor.getProgramCounter();
-		processor.runInstruction(0x90, 0xFF, -1);
-		assertTrue(processor.getProgramCounter() == previous1 + 0xFF);
-		assertTrue(processor.getCurrentCycles() == 4);
-	}
-
-	@Test
 	public void bcsSecClcTest() throws UnknownOpcodeException, IncorrectOpcodeException {
 		int previous = processor.getProgramCounter();
 		processor.runInstruction(0x38, -1, -1);

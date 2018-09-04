@@ -15,44 +15,20 @@ import nespresso.memory.Memory;
 @Slf4j
 public class PictureProcessingUnit {
 
-	@Getter
-	@Setter
-	private int totalPpuCycles = 0;
+	@Getter @Setter private int totalPpuCycles = 0;
 	private static PictureProcessingUnit ppu;
-	@Getter
-	@Setter
-	private Processor processor;
-	@Getter
-	@Setter
-	private Canvas canvas;
-	@Getter
-	@Setter
-	private Memory memory;
-	@Getter
-	@Setter
-	int[] internalMemory = new int[0x4000];
+	@Getter @Setter private Processor processor;
+	@Getter @Setter private Canvas canvas;
+	@Getter @Setter private Memory memory;
+	@Getter @Setter int[] internalMemory = new int[0x4000];
 	int[] primaryOam = new int[0x100];
-	@Getter
-	@Setter
-	private int ctrl = 0;
-	@Getter
-	@Setter
-	private int mask = 0;
-	@Getter
-	@Setter
-	private int status = 0;
-	@Getter
-	@Setter
-	private int oamdata = 0;
-	@Getter
-	@Setter
-	private int oamaddr = 0;
-	@Getter
-	@Setter
-	private int data = 0;
-	@Getter
-	@Setter
-	private int scroll = 0;
+	@Getter @Setter private int ctrl = 0;
+	@Getter @Setter private int mask = 0;
+	@Setter private int status = 0;
+	@Getter @Setter private int oamdata = 0;
+	@Getter @Setter private int oamaddr = 0;
+	@Getter @Setter private int data = 0;
+	@Getter @Setter private int scroll = 0;
 	private static final int BACKGROUND_COLOR = 0x3F00;
 	private Queue<Integer> lowTileBytes = new LinkedList<>();
 	private Queue<Integer> highTileBytes = new LinkedList<>();
@@ -107,7 +83,7 @@ public class PictureProcessingUnit {
 	}
 
 	private void drawOnPrerenderLine() {
-		if (currPixel == 1) {
+		if (currPixel == 2) {
 			clearVblank();
 		}
 		if (renderingIsOn()) {
@@ -421,6 +397,13 @@ public class PictureProcessingUnit {
 		setStatus(newVal);
 		nmiChange();
 		//System.out.println("Vblank cleared PPU Cycles: " + totalPpuCycles + " CPU Cycles: " + processor.getTotalCycles());
+	}
+	
+	public int getStatus() {
+		if(currLine == 241 && currPixel == 2) {
+			status = (status & 0x3F);
+		}
+		return status;
 	}
 
 	private boolean renderingIsOn() {

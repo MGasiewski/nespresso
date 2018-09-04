@@ -19,14 +19,19 @@ public class NesController {
 	private PictureProcessingUnit ppu;
 	private String donkeyKong = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\donkey kong.nes"; 
 	private String nesTest = "C:\\Users\\Matt\\IdeaProjects\\Nespresso\\bin\\nestest.nes";
-	private String test = "C:\\Users\\Matt\\nes-test-roms\\cpu_timing_test6\\cpu_timing_test.nes";
+	private String test = "C:\\Users\\Matt\\nes-test-roms\\blargg_nes_cpu_test5\\official.nes";
+	private String cpuTest = "C:\\Users\\Matt\\Downloads\\instr_test-v5\\instr_test-v5\\rom_singles\\03-immediate.nes";
+	private String ppuTest= "C:\\Users\\Matt\\nes-test-roms\\ppu_vbl_nmi\\rom_singles\\07-nmi_on_timing.nes";
+	private String tetris = "C:\\Users\\Matt\\Downloads\\Tetris (USA).nes";
+	private String balloonFight = "C:\\Users\\Matt\\Downloads\\Balloon Fight (USA)\\Balloon Fight (USA).nes";
 	private final int HEIGHT = 270;
 	private final int WIDTH = 266;
 	
 	public void initializeNes() {
 		ppu = PictureProcessingUnit.getInstance();
 		try {
-			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
+			//memory = new MMC1Mapper(new FileInputStream(test), ppu);
+			memory = new NromMapper(new FileInputStream(cpuTest), ppu);
 		} catch (FileNotFoundException e) {
 			log.error("Cannot find rom");
 			e.printStackTrace();

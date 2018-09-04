@@ -3,9 +3,9 @@ package nespresso.processing;
 public class PpuHandler {
 
 	public int read(int address) {
-		int num = address & 0xF;
+		int num = address & 0x7;
 		switch (num) {
-		case 2:
+		case 2: case 0xA:
 			PictureProcessingUnit.getInstance().resetAddressLatch();
 			int value = PictureProcessingUnit.getInstance().getStatus();
 			PictureProcessingUnit.getInstance().setStatus(value & 0x7F);
@@ -21,7 +21,12 @@ public class PpuHandler {
 	}
 
 	public void write(int address, int data) {
-		int num = address & 0xFF;
+		int num = address & 0x7;
+		if(address == 0x4014) {
+			PictureProcessingUnit.getInstance().writeSprites(data);
+			int cycles = PictureProcessingUnit.getInstance().getProcessor().getCurrentCycles() + 513;
+			PictureProcessingUnit.getInstance().getProcessor().setCurrentCycles(cycles);
+		}
 		switch (num) {
 		case 0:
 			PictureProcessingUnit.getInstance().setCtrl(data);
@@ -49,11 +54,6 @@ public class PpuHandler {
 			break;
 		case 0x7:
 			PictureProcessingUnit.getInstance().writeToVram(data);
-			break;
-		case 0x14:
-			PictureProcessingUnit.getInstance().writeSprites(data);
-			int cycles = PictureProcessingUnit.getInstance().getProcessor().getCurrentCycles() + 513;
-			PictureProcessingUnit.getInstance().getProcessor().setCurrentCycles(cycles);
 			break;
 		}
 		

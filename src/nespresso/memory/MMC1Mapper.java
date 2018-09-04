@@ -18,7 +18,7 @@ public class MMC1Mapper extends Memory {
 	int control = 0;
 	int chrBank0 = 0;
 	int chrBank1 = 0;
-	int prgBank = 0;
+	int prgBankSelection = 0;
 	int prgMode = 0;
 	int chrMode = 0;
 	int[][] prgBanks;
@@ -44,7 +44,7 @@ public class MMC1Mapper extends Memory {
 				} else if (count == 8) {
 					eightKbPrgBanks = aByte;
 				} else if (count > 15 && count < prgBankLimit) {
-					int rawIndex = count - 15;
+					int rawIndex = count - 16;
 					int bank = rawIndex / sixteenKb;
 					int offset = rawIndex % sixteenKb;
 					prgBanks[bank][offset] = aByte;
@@ -53,22 +53,63 @@ public class MMC1Mapper extends Memory {
 					int bank = rawIndex / fourKb;
 					int offset = rawIndex % fourKb;
 					chrBanks[bank][offset] = aByte;
+				} else if (count >= chrLimit) {
+					ppu.getInternalMemory()[count - chrLimit] = aByte;
 				}
 				count += 1;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		System.arraycopy(chrBanks[0], 0, ppu.getInternalMemory(), 0, chrBanks[0].length);
+		if(numOfChrBanks > 1) {
+			System.arraycopy(chrBanks[1], 0, ppu.getInternalMemory(), 0x1000, chrBanks[1].length);
+		}else {
+			System.arraycopy(chrBanks[0], 0, ppu.getInternalMemory(), 0x1000, chrBanks.length);
+		}
 	}
 
 	@Override
 	public int getByte(int address) {
-		if (address < 0x6000) {
+		if (address < 0x8000) {
 			return super.getByte(address);
 		}else {
-			
+			super.getByte(address);
+			if((control & 0xC) == 0xC) {
+				return readMode3(address);
+			}else if((control & 0xC) == 0x8) {
+				return readMode2(address);
+			}else {
+				return readMode1(address);
+			}
 		}
-		return 0;
+	}
+	
+	public int readMode1(int address) {
+		int bank = prgBankSelection & 0xE;
+		if(address < 0xC000) {
+			return prgBanks[bank][address - 0x8000];
+		}else {
+			return prgBanks[bank][address - 0xC000];
+		}
+	}
+	
+	public int readMode2(int address) {
+		if(address < 0xC000 ) {
+			return prgBanks[0][address - 0x8000];
+		}else {
+			int currentBank  = prgBankSelection & 0xF;
+			return prgBanks[currentBank][address - 0xC000];
+		}
+	}
+	
+	public int readMode3(int address) {
+		if(address >= 0xC000) {
+			return prgBanks[numOfPrgBanks-1][address - 0xC000];
+		}else {
+			int currentBank = prgBankSelection & 0xF;
+			return prgBanks[currentBank][address - 0x8000];
+		}
 	}
 
 	@Override
@@ -76,12 +117,13 @@ public class MMC1Mapper extends Memory {
 		if (address < 0x6000) {
 			super.setByte(address, value);
 		} else if (address >= 0x8000 && address <= 0xFFFF) {
+			super.setByte(address, value);
 			doLoadRegister(address, value);
 		}
 	}
 
 	private void setPrgBank(int value) {
-		prgBank = value;
+		prgBankSelection = value;
 	}
 
 	private void setChrBank1(int value) {
@@ -93,7 +135,7 @@ public class MMC1Mapper extends Memory {
 	private void setChrBank0(int value) {
 		chrBank0 = value;
 		int bank = chrBank0 & 0xF;
-		System.arraycopy(chrBanks[bank], 0, ppu.getInternalMemory(), 0, chrBanks[bank].length);;
+		System.arraycopy(chrBanks[bank], 0, ppu.getInternalMemory(), 0, chrBanks[bank].length);
 	}
 	
 	private void setControl(int value) {

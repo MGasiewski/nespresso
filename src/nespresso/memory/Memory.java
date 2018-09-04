@@ -11,9 +11,6 @@ import nespresso.processing.PpuHandler;
 @Slf4j
 public class Memory {
 	private int[] cpuMemory = new int[65536];
-
-	protected List<Integer> ppuRegisters = List.of(0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007,
-			0x4014);
 	protected PpuHandler ppuHandler;
 
 	public Memory(String memString) {
@@ -27,16 +24,23 @@ public class Memory {
 	public Memory() {
 		ppuHandler = new PpuHandler();
 	}
+	
+	public boolean isPpuRegister(int address) {
+		if((address >= 0x2000 && address <= 0x2FFF) || address == 0x4014) {
+			return true;
+		}
+		return false;
+	}
 
 	public int getByte(int address) {
-		if (ppuRegisters.contains(address)) {
+		if (isPpuRegister(address)) {
 			return ppuHandler.read(address);
 		}
 		return cpuMemory[address];
 	}
 
 	public void setByte(int address, int value) {
-		if (ppuRegisters.contains(address)) {
+		if (isPpuRegister(address)) {
 			ppuHandler.write(address, value);
 		} else {
 			cpuMemory[address] = value;

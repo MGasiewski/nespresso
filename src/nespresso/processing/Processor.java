@@ -16,54 +16,32 @@ import nespresso.memory.Memory;
 
 @Slf4j
 public class Processor {
-	@Getter
-	@Setter
-	private int totalCycles = 0;
-	@Getter
-	@Setter
-	private boolean nmi;
-	@Getter
-	private int accumulator = 0;
-	@Getter
-	private int xIndex = 0;
-	@Getter
-	private int yIndex = 0;
-	@Getter
-	private int stackPointer = 0xFF;
-	@Getter
-	private int programCounter = 0;
-	@Getter
-	private boolean carryFlag = false;
-	@Getter
-	private boolean zeroFlag = false;
-	@Getter
-	private boolean interruptFlag = false;
-	@Getter
-	private boolean decimalModeFlag = true;
-	@Getter
-	private boolean softwareInterruptFlag = true;
-	@Getter
-	private boolean overflowFlag = false;
-	@Getter
-	private boolean signFlag = false;
+	@Getter @Setter private int totalCycles = 0;
+	@Getter @Setter private boolean nmi;
+	@Getter private int accumulator = 0;
+	@Getter private int xIndex = 0;
+	@Getter private int yIndex = 0;
+	@Getter private int stackPointer = 0xFF;
+	@Getter private int programCounter = 0;
+	@Getter private boolean carryFlag = false;
+	@Getter private boolean zeroFlag = false;
+	@Getter private boolean interruptFlag = false;
+	@Getter private boolean decimalModeFlag = true;
+	@Getter private boolean softwareInterruptFlag = true;
+	@Getter private boolean overflowFlag = false;
+	@Getter private boolean signFlag = false;
 	private static int ENDIAN_MULT = 256;
-	@Getter
-	@Setter
-	private Memory memory;
-	@Getter
-	@Setter
-	private int currentCycles = 0;
-	@Getter
-	@Setter
-	private PictureProcessingUnit ppu;
+	@Getter @Setter private Memory memory;
+	@Getter @Setter private int currentCycles = 0;
+	@Getter @Setter private PictureProcessingUnit ppu;
 	private List<String> operationCache = new ArrayList<>();
 	public int cpuCycles = 0;
 
 	public Processor(Memory memory) {
 		setMemory(memory);
-		for (int i = 0; i < 0x800; ++i) {
-			memory.setByte(i, 0xFF);
-		}
+		//for (int i = 0; i < 0x800; ++i) {
+		//	memory.setByte(i, 0xFF);
+		//}
 		memory.setByte(0x0008, 0xF7);
 		memory.setByte(0x0009, 0xEF);
 		memory.setByte(0x000A, 0xDF);
@@ -135,11 +113,7 @@ public class Processor {
 			throws UnknownOpcodeException, IncorrectOpcodeException {
 		switch (opcode) {
 		// ASL - Arithmetic Shift Left
-		case 0x0A:
-		case 0x06:
-		case 0x16:
-		case 0x0E:
-		case 0x1E:
+		case 0x0A: case 0x06: case 0x16: case 0x0E: case 0x1E:
 			arithmeticShiftLeft(opcode, operand0, operand1);
 			break;
 		// BCC - Branch if carry clear
@@ -188,63 +162,34 @@ public class Processor {
 			currentCycles = 5;
 			break;
 		// LDA COMMANDS
-		case 0xA9:
-		case 0xA5:
-		case 0xB5:
-		case 0xAD:
-		case 0xBD:
-		case 0xB9:
-		case 0xA1:
-		case 0xB1:
+		case 0xA9: case 0xA5: case 0xB5: case 0xAD: case 0xBD: 
+		case 0xB9: case 0xA1: case 0xB1:
 			loadIntoAccumulator(opcode, operand0, operand1);
 			break;
 		// LDX COMMANDS
-		case 0xA2:
-		case 0xA6:
-		case 0xB6:
-		case 0xAE:
-		case 0xBE:
+		case 0xA2: case 0xA6: case 0xB6: case 0xAE: case 0xBE:
 			loadIntoX(opcode, operand0, operand1);
 			break;
 		// LDY COMMANDS
-		case 0xA0:
-		case 0xA4:
-		case 0xB4:
-		case 0xAC:
-		case 0xBC:
+		case 0xA0: case 0xA4: case 0xB4: case 0xAC: case 0xBC:
 			loadIntoY(opcode, operand0, operand1);
 			break;
 		// AND COMMANDS
-		case 0x29:
-		case 0x25:
-		case 0x35:
-		case 0x2D:
-		case 0x3D:
-		case 0x39:
-		case 0x21:
-		case 0x31:
+		case 0x29: case 0x25: case 0x35: case 0x2D: case 0x3D: 
+		case 0x39: case 0x21: case 0x31:
 			andWithAccumulator(opcode, operand0, operand1);
 			break;
 		// STA COMMANDS
-		case 0x85:
-		case 0x95:
-		case 0x8D:
-		case 0x9D:
-		case 0x99:
-		case 0x81:
-		case 0x91:
+		case 0x85: case 0x95: case 0x8D: case 0x9D: case 0x99:
+		case 0x81: case 0x91:
 			storeAccumulator(opcode, operand0, operand1);
 			break;
 		// STX commands
-		case 0x86:
-		case 0x96:
-		case 0x8E:
+		case 0x86: case 0x96: case 0x8E:
 			storeX(opcode, operand0, operand1);
 			break;
 		// STY commands
-		case 0x84:
-		case 0x94:
-		case 0x8C:
+		case 0x84: case 0x94: case 0x8C:
 			storeY(opcode, operand0, operand1);
 			break;
 		// TAX Transfer accumulator to X
@@ -288,19 +233,12 @@ public class Processor {
 			signFlag = accumulator >> 7 == 1;
 			break;
 		// ADC Add with carry
-		case 0x69:
-		case 0x65:
-		case 0x75:
-		case 0x6D:
-		case 0x7D:
-		case 0x79:
-		case 0x61:
-		case 0x71:
+		case 0x69: case 0x65: case 0x75: case 0x6D: case 0x7D:
+		case 0x79: case 0x61: case 0x71:
 			addWithCarry(opcode, operand0, operand1);
 			break;
 		// BIT - Bit test
-		case 0x24:
-		case 0x2C:
+		case 0x24: case 0x2C:
 			bitTest(opcode, operand0, operand1);
 			break;
 		// BRK - Break. Store the program counter and processor state on the stack and
@@ -309,33 +247,20 @@ public class Processor {
 			brk();
 			break;
 		// CMP - Compare with accumulator
-		case 0xC9:
-		case 0xC5:
-		case 0xD5:
-		case 0xCD:
-		case 0xDD:
-		case 0xD9:
-		case 0xC1:
-		case 0xD1:
+		case 0xC9: case 0xC5: case 0xD5: case 0xCD: case 0xDD:
+		case 0xD9: case 0xC1: case 0xD1:
 			compareWithAccumulator(opcode, operand0, operand1);
 			break;
 		// CPX - Compare with X
-		case 0xE0:
-		case 0xE4:
-		case 0xEC:
+		case 0xE0: case 0xE4: case 0xEC:
 			compareWithX(opcode, operand0, operand1);
 			break;
 		// CPY - Compare with Y
-		case 0xC0:
-		case 0xC4:
-		case 0xCC:
+		case 0xC0: case 0xC4: case 0xCC:
 			compareWithY(opcode, operand0, operand1);
 			break;
 		// DEC - Decrement memory
-		case 0xC6:
-		case 0xD6:
-		case 0xCE:
-		case 0xDE:
+		case 0xC6: case 0xD6: case 0xCE: case 0xDE:
 			decrementMemory(opcode, operand0, operand1);
 			break;
 		// DEX - decrement X
@@ -353,14 +278,8 @@ public class Processor {
 			signFlag = yIndex >> 7 == 1;
 			break;
 		// EOR - Exclusive Or
-		case 0x49:
-		case 0x45:
-		case 0x55:
-		case 0x4D:
-		case 0x5D:
-		case 0x59:
-		case 0x41:
-		case 0x51:
+		case 0x49: case 0x45: case 0x55: case 0x4D: case 0x5D:
+		case 0x59: case 0x41: case 0x51:
 			xorAccumulator(opcode, operand0, operand1);
 			break;
 		// CLC - Clear Carry
@@ -399,10 +318,7 @@ public class Processor {
 			currentCycles = 2;
 			break;
 		// INC - Increment Memory
-		case 0xE6:
-		case 0xF6:
-		case 0xEE:
-		case 0xFE:
+		case 0xE6: case 0xF6: case 0xEE: case 0xFE:
 			incrementMemory(opcode, operand0, operand1);
 			break;
 		// INX - Increment x index
@@ -420,53 +336,32 @@ public class Processor {
 			signFlag = yIndex >> 7 == 1;
 			break;
 		// NOP - no operation
-		case 0xEA:
-			currentCycles = 2;
+		case 0xEA: case 0x1A: case 0x3A: case 0x5A: case 0x7A:
+		case 0xDA: case 0xFA: case 0x80: case 0x82: case 0x89:
+		case 0xC2: case 0xE2:
+			currentCycles = 2; //TODO 0x80, 0x82, 0x89, 0xC2, 0xE2 
+							   //likely take more than two cycles
 			break;
 		// LSR - Logical Shift Right
-		case 0x4A:
-		case 0x46:
-		case 0x56:
-		case 0x4E:
-		case 0x5E:
+		case 0x4A: case 0x46: case 0x56: case 0x4E: case 0x5E:
 			logicalShiftRight(opcode, operand0, operand1);
 			break;
 		// SBC - Subtract with carry
-		case 0xE9:
-		case 0xE5:
-		case 0xF5:
-		case 0xED:
-		case 0xFD:
-		case 0xF9:
-		case 0xE1:
-		case 0xF1:
+		case 0xE9: case 0xE5: case 0xF5: case 0xED: case 0xFD:
+		case 0xF9: case 0xE1: case 0xF1: case 0xEB:
 			subtractWithCarry(opcode, operand0, operand1);
 			break;
 		// ORA - Logical or
-		case 0x09:
-		case 0x05:
-		case 0x15:
-		case 0x0D:
-		case 0x1D:
-		case 0x19:
-		case 0x01:
-		case 0x11:
+		case 0x09: case 0x05: case 0x15: case 0x0D: case 0x1D:
+		case 0x19: case 0x01: case 0x11:
 			logicalOr(opcode, operand0, operand1);
 			break;
 		// ROL - rotate left
-		case 0x2A:
-		case 0x26:
-		case 0x36:
-		case 0x2E:
-		case 0x3E:
+		case 0x2A: case 0x26: case 0x36: case 0x2E: case 0x3E:
 			rotateLeft(opcode, operand0, operand1);
 			break;
 		// ROR - rotate right
-		case 0x6A:
-		case 0x66:
-		case 0x76:
-		case 0x6E:
-		case 0x7E:
+		case 0x6A: case 0x66: case 0x76: case 0x6E: case 0x7E:
 			rotateRight(opcode, operand0, operand1);
 			break;
 		// PHA - Push Accumulator
@@ -476,7 +371,9 @@ public class Processor {
 			break;
 		// PHP - Push Processor Status
 		case 0x08:
-			push(getStatus());
+			int tempStatus = getStatus();
+			tempStatus |= 0x30;
+			push(tempStatus);
 			currentCycles = 3;
 			break;
 		// PLA - Pull Accumulator
@@ -501,6 +398,31 @@ public class Processor {
 		case 0x60:
 			returnFromSubroutine();
 			currentCycles = 6;
+			break;
+		case 0xB: case 0x2B: //ANC - an unofficial opcode
+			carryFlag = (accumulator & operand0) >> 7 == 1;
+			currentCycles = 2;
+			break;
+		case 0x4B: //ALR - an unofficial opcode
+			andWithAccumulator(0x29, operand0, 0);
+			logicalShiftRight(0x4A, 0, 0);
+			currentCycles = 2;
+			break;
+		case 0x6B: //ARR - unofficial opcode
+			andWithAccumulator(0x29, operand0, 0);
+			rotateRight(0x6A, 0, 0);
+			currentCycles = 2;
+			break;
+		case 0xAB: //LAX - unofficial opcode
+			accumulator = xIndex = memory.getByte(operand0);
+			zeroFlag = accumulator == 0;
+			signFlag = (accumulator >> 7) == 1;
+			break;
+		case 0xCB: //AXS - unofficial opcode
+			xIndex = ((accumulator & xIndex) - memory.getByte(operand0)) & 0xFF;
+			zeroFlag = xIndex == 0;
+			signFlag = (xIndex >> 7) == 1;
+			carryFlag = (xIndex >= 0);
 			break;
 		default:
 			throw new UnknownOpcodeException();
@@ -722,7 +644,7 @@ public class Processor {
 		push(highByte);
 		push(lowByte);
 		// does Processor status change?
-		push(getStatus() | 0x18);
+		push(getStatus() | 0x30);
 		programCounter = 0;
 		programCounter = memory.getByte(0xFFFF) * ENDIAN_MULT;
 		programCounter += memory.getByte(0xFFFE);
@@ -784,7 +706,7 @@ public class Processor {
 		int minuend = accumulator;
 		int subtrahend = 0;
 		switch (opcode) {
-		case 0xE9:
+		case 0xE9: case 0xEB:
 			subtrahend = operand0;
 			accumulator -= subtrahend;
 			accumulator -= borrow;
@@ -1007,6 +929,7 @@ public class Processor {
 			beginValue = memory.getByte(convertOperandsToAddress(operand0, operand1));
 			endValue = (beginValue << 1) % 0x100;
 			memory.setByte(convertOperandsToAddress(operand0, operand1), endValue);
+			break;
 		case 0x1E:
 			beginValue = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
 			endValue = (beginValue << 1) % 0x100;
@@ -1471,7 +1394,7 @@ public class Processor {
 	}
 
 	private int zeroPageWithOffset(int operand0, int offset) {
-		return (operand0 + offset) % 0x100;
+		return (operand0 + offset) & 0xFF;
 	}
 
 	private int indirectX(int operand0) {
@@ -1497,7 +1420,7 @@ public class Processor {
 	}
 
 	private boolean isPageBoundaryCrossed(int address, int offset) {
-		return address % 0x100 > (address + offset) % 0x100;
+		return (address & 0xFF) > ((address + offset) & 0xFF); //TODO this doesn't account for a backward page boundary cross
 	}
 
 	private void NMI() {
