@@ -498,7 +498,7 @@ public class Processor {
 		default:
 			throw new IncorrectOpcodeException();
 		}
-		zeroFlag = accumulator == 0;
+		zeroFlag = result == 0;
 		carryFlag = (original & 0b00000001) == 1;
 		signFlag = result >> 7 == 1;
 	}
@@ -552,7 +552,7 @@ public class Processor {
 		default:
 			break;
 		}
-		zeroFlag = accumulator == 0;
+		zeroFlag = result == 0;
 		carryFlag = original >> 7 == 1;
 		signFlag = result >> 7 == 1;
 	}
@@ -600,7 +600,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0x15:
-			accumulator |= zeroPageWithOffset(operand0, xIndex);
+			accumulator |= memory.getByte(zeroPageWithOffset(operand0, xIndex));
 			currentCycles = 4;
 			break;
 		case 0x0D:
@@ -702,77 +702,54 @@ public class Processor {
 	}
 
 	private void subtractWithCarry(int opcode, int operand0, int operand1) {
-		int borrow = carryFlag ? 0 : 1;
-		int minuend = accumulator;
 		int subtrahend = 0;
+		int sbcCycles = 0;
 		switch (opcode) {
-		case 0xE9: case 0xEB:
+		case 0xE9:
 			subtrahend = operand0;
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 2;
+			sbcCycles = 2;
 			break;
 		case 0xE5:
 			subtrahend = memory.getByte(operand0);
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 3;
+			sbcCycles = 3;
 			break;
 		case 0xF5:
 			subtrahend = memory.getByte(zeroPageWithOffset(operand0, xIndex));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 4;
 			break;
 		case 0xED:
 			subtrahend = memory.getByte(convertOperandsToAddress(operand0, operand1));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 4;
+			sbcCycles = 4;
 			break;
 		case 0xFD:
 			subtrahend = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 4;
+			sbcCycles = 4;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
 				currentCycles += 1;
 			}
 			break;
 		case 0xF9:
-			subtrahend = memory.getByte(indirectY(operand0));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 4;
-			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
-				currentCycles += 1;
+			subtrahend = memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
+			sbcCycles = 4;
+			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex)) {
+				sbcCycles += 1;
 			}
 			break;
 		case 0xE1:
 			subtrahend = memory.getByte(indirectX(operand0));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 6;
+			sbcCycles = 6;
 			break;
 		case 0xF1:
 			subtrahend = memory.getByte(indirectY(operand0));
-			accumulator -= subtrahend;
-			accumulator -= borrow;
-			currentCycles = 5;
+			sbcCycles = 5;
 			if (isPageBoundaryCrossed(convertOperandsToAddress(memory.getByte(operand0), memory.getByte(operand1 + 1)),
 					yIndex)) {
-				currentCycles += 1;
+				sbcCycles += 1;
 			}
 		default:
 			break;
 		}
-		if (accumulator < 0) {
-			accumulator = 0xFF + accumulator + 1;
-		}
-		carryFlag = minuend >= subtrahend;
-		signFlag = accumulator >> 7 == 1;
-		zeroFlag = accumulator == 0;
-		overflowFlag = evaluateOverflowSbc(minuend, subtrahend, accumulator);
+		addWithCarry(0x69, (~subtrahend) & 0xFF, 0);
+		currentCycles = sbcCycles;
 		accumulator &= 0xFF;
 	}
 
@@ -976,7 +953,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0xD5:
-			result = accumulator - memory.getByte(operand0 + xIndex);
+			result = accumulator - memory.getByte(zeroPageWithOffset(operand0, xIndex));
 			currentCycles = 4;
 			break;
 		case 0xCD:
@@ -1072,8 +1049,9 @@ public class Processor {
 			currentCycles = 5;
 			break;
 		case 0xF6:
-			newVal = (memory.getByte(operand0 + xIndex) +1) & 0xFF;
-			memory.setByte(operand0, newVal);
+			int address = (operand0 + xIndex) & 0xFF;
+			newVal = (memory.getByte(address) +1) & 0xFF;
+			memory.setByte(address, newVal);
 			currentCycles = 6;
 			break;
 		case 0xEE:
@@ -1128,9 +1106,10 @@ public class Processor {
 			currentCycles = 6;
 			break;
 		case 0xB1: // " " Indirect Y
-			accumulator = memory.getByte(indirectY(operand0));
+			int address = indirectY(operand0);
+			accumulator = memory.getByte(address);
 			currentCycles = 5;
-			if (isPageBoundaryCrossed(memory.getByte(operand0), yIndex)) {
+			if (isPageBoundaryCrossed(address, yIndex)) {
 				currentCycles += 1;
 			}
 			break;
@@ -1150,7 +1129,7 @@ public class Processor {
 			currentCycles = 3;
 			break;
 		case 0xB6: // " " with zero page + operand + x index
-			xIndex = memory.getByte(zeroPageWithOffset(operand0, xIndex));
+			xIndex = memory.getByte(zeroPageWithOffset(operand0, yIndex));
 			currentCycles = 4;
 			break;
 		case 0xAE: // " " with absolute
@@ -1158,9 +1137,9 @@ public class Processor {
 			currentCycles = 4;
 			break;
 		case 0xBE: // " " with absolute + x index
-			xIndex = memory.getByte(convertOperandsToAddress(operand0, operand1, xIndex));
+			xIndex = memory.getByte(convertOperandsToAddress(operand0, operand1, yIndex));
 			currentCycles = 4;
-			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), xIndex)) {
+			if (isPageBoundaryCrossed(convertOperandsToAddress(operand0, operand1), yIndex)) {
 				currentCycles += 1;
 			}
 			break;
@@ -1404,7 +1383,9 @@ public class Processor {
 	}
 
 	private int indirectY(int operand0) {
-		int address = memory.getByte(operand0) + memory.getByte(operand0 + 1) * ENDIAN_MULT + yIndex;
+		int add0 = operand0 & 0xFF;
+		int add1 = (operand0 + 1) & 0xFF;
+		int address = memory.getByte(add0) + memory.getByte(add1) * ENDIAN_MULT + yIndex;
 		return address & 0xFFFF;
 	}
 

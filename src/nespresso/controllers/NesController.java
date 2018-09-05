@@ -31,7 +31,7 @@ public class NesController {
 		ppu = PictureProcessingUnit.getInstance();
 		try {
 			//memory = new MMC1Mapper(new FileInputStream(test), ppu);
-			memory = new NromMapper(new FileInputStream(cpuTest), ppu);
+			memory = new NromMapper(new FileInputStream(donkeyKong), ppu);
 		} catch (FileNotFoundException e) {
 			log.error("Cannot find rom");
 			e.printStackTrace();

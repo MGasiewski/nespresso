@@ -392,5 +392,12 @@ public class ProcessorTest {
 	public void jsrRtiTest() {
 		
 	}
+	
+	@Test
+	public void sbcTest() throws UnknownOpcodeException, IncorrectOpcodeException {
+		processor.runInstruction(0xA9, 0xF, 0);
+		processor.runInstruction(0xe9, 0xF0, 0);
+		System.out.println(processor.getAccumulator());
+	}
 
 }
